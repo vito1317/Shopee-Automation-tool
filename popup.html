@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蝦皮自動化工具設定</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h3>蝦皮自動化工具 v3.0.0</h3>
+    <hr>
+    <!-- Master Switch -->
+    <div class="setting master-switch">
+        <label class="switch">
+            <input type="checkbox" id="masterSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="masterStatusText">啟用所有功能</span>
+    </div>
+    <hr>
+
+    <!-- Individual Features -->
+    <h4>功能開關:</h4>
+    
+    
+     <div class="setting">
+        <label class="switch">
+            <input type="checkbox" id="featureQueueingSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureQueueingStatusText">自動叫號</span>
+    </div>
+    <div class="setting">
+        <label class="switch">
+            <input type="checkbox" id="featureCheckoutSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureCheckoutStatusText">自動結帳</span>
+    </div>
+    <div class="setting">
+        <label class="switch">
+            <input type="checkbox" id="featureBoxScanSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureBoxScanStatusText">自動刷取物流箱單</span>
+    </div>
+    <div class="setting">
+        <label class="switch">
+            <input type="checkbox" id="featureNextDaySwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureNextDayStatusText">自動完成隔日</span>
+    </div>
+    <!-- Sub-option for Next Day -->
+    <div class="setting sub-setting">
+         <label class="switch small-switch">
+            <input type="checkbox" id="featureNextDayAutoStartSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureNextDayAutoStartStatusText">↳ 自動開始下一筆</span>
+    </div>
+    <div class="setting">
+        <label class="switch">
+            <input type="checkbox" id="featureFileScanSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureFileScanStatusText">自動刷取電子檔</span>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
