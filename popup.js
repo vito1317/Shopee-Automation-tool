@@ -3,273 +3,249 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Define Switch Elements and Storage Keys ---
     const switches = {
         master: { el: document.getElementById('masterSwitch'), key: 'masterEnabled', textEl: document.getElementById('masterStatusText'), default: true, label: '所有功能' },
+
         queueing: { el: document.getElementById('featureQueueingSwitch'), key: 'featureQueueingEnabled', textEl: document.getElementById('featureQueueingStatusText'), default: true, label: '自動叫號' },
+        queueingAction: { el: document.getElementById('featureQueueingActionSwitch'), key: 'featureQueueingAction', textEl: document.getElementById('featureQueueingActionStatusText'), default: true, label: '↳ 動作', parentKey: 'queueing', type: 'action', container: document.getElementById('featureQueueingActionContainer') },
+
         checkout: { el: document.getElementById('featureCheckoutSwitch'), key: 'featureCheckoutEnabled', textEl: document.getElementById('featureCheckoutStatusText'), default: true, label: '自動結帳' },
+        checkoutAction: { el: document.getElementById('featureCheckoutActionSwitch'), key: 'featureCheckoutAction', textEl: document.getElementById('featureCheckoutActionStatusText'), default: true, label: '↳ 動作', parentKey: 'checkout', type: 'action', container: document.getElementById('featureCheckoutActionContainer') },
+
         boxScan: { el: document.getElementById('featureBoxScanSwitch'), key: 'featureBoxScanEnabled', textEl: document.getElementById('featureBoxScanStatusText'), default: true, label: '自動刷取物流箱單' },
+
         nextDay: { el: document.getElementById('featureNextDaySwitch'), key: 'featureNextDayEnabled', textEl: document.getElementById('featureNextDayStatusText'), default: true, label: '自動完成隔日' },
-        // Child of 'nextDay'
-        nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay' },
+        nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureNextDayAutoStartContainer') },
+
         fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
     };
 
     // --- Helper Functions ---
 
-    // Updates the text description and color next to a switch
-    function updateStatusText(switchConfig, isEnabled) {
-        if (!switchConfig || !switchConfig.textEl) return;
-        let statusText = '';
-        let color = '#6c757d'; // Default grey
-        const lastError = chrome.runtime.lastError;
-
-        // Check for storage errors first
-        // Ignore "message port closed" which happens if popup closes during async ops
-        if (lastError && !lastError.message?.includes("message port closed")) {
-             statusText = `${switchConfig.label} (讀取/儲存錯誤)`;
-             color = '#dc3545'; // Red for error
-        } else {
-            // Standard status text
-            let statusPrefix = isEnabled ? '已啟用' : '已停用';
-            color = isEnabled ? '#28a745' : '#6c757d'; // Green if enabled, grey if disabled
-            if (switchConfig.key === 'masterEnabled') {
-                statusPrefix = isEnabled ? '啟用' : '停用'; // Slightly different wording for master
-                statusText = `${statusPrefix} ${switchConfig.label}`;
-            } else {
-                statusText = `${switchConfig.label} (${statusPrefix})`;
-            }
+    function updateStatusText(switchConfig, isEnabled, parentIsEnabled = true) {
+        if (!switchConfig?.textEl || !document.body.contains(switchConfig.textEl)) {
+            // console.warn(`updateStatusText: Cannot update text for ${switchConfig?.key} - Element not found or config missing.`);
+            return;
         }
-        // Ensure the text element still exists in the DOM before updating
-        if (document.body.contains(switchConfig.textEl)) {
-            switchConfig.textEl.textContent = statusText;
-            switchConfig.textEl.style.color = color;
+
+        let statusText = '';
+        let color = '#6c757d';
+        const isActionSwitch = switchConfig.type === 'action';
+        const isSubOption = switchConfig.type === 'sub-option';
+        const isDisabledByParent = (isActionSwitch || isSubOption) && !parentIsEnabled;
+        const label = switchConfig.label || `[${switchConfig.key}]`;
+
+        if (switchConfig.key === 'masterEnabled') {
+            statusText = `${isEnabled ? '啟用' : '停用'} ${label}`;
+            color = isEnabled ? '#28a745' : '#6c757d';
+        } else if (isActionSwitch) {
+            // Using your text for focus option
+            const action = isEnabled ? '點擊' : '聚焦(需按Enter鍵)';
+            statusText = `${label}: ${action}`;
+            color = isDisabledByParent ? '#aaa' : (isEnabled ? '#007bff' : '#ffc107');
+        } else if (isSubOption) {
+            statusText = `${label} (${isEnabled ? '已啟用' : '已停用'})`;
+            color = isDisabledByParent ? '#aaa' : (isEnabled ? '#28a745' : '#6c757d');
+        } else {
+            statusText = `${label} (${isEnabled ? '已啟用' : '已停用'})`;
+            color = isEnabled ? '#28a745' : '#6c757d';
+        }
+
+        switchConfig.textEl.textContent = statusText;
+        switchConfig.textEl.style.color = color;
+
+        if ((isActionSwitch || isSubOption) && switchConfig.container) {
+             switchConfig.container.classList.toggle('disabled-parent', isDisabledByParent);
         }
     }
 
-    // Loads all switch states from chrome.storage.sync on popup open
+    function updateChildSwitchUI(childConfig) {
+        if (!childConfig?.el || !childConfig.parentKey) {
+             // console.warn(`updateChildSwitchUI: Invalid config for key: ${childConfig?.key}`);
+             return;
+        }
+
+        const parentConfig = Object.values(switches).find(p => p.key === childConfig.parentKey);
+        const parentIsEnabled = parentConfig?.el?.checked ?? true; // Assume parent enabled if not found
+
+        childConfig.el.disabled = !parentIsEnabled;
+        updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
+    }
+
     function loadAllStates() {
         const keysToGet = {};
-        // Prepare object with keys and their default values
         Object.values(switches).forEach(config => {
             keysToGet[config.key] = config.default;
         });
 
         chrome.storage.sync.get(keysToGet, (data) => {
+            // --- Error Handling ---
             const lastError = chrome.runtime.lastError;
-            // Handle potential storage read errors
-            if (lastError && !lastError.message?.includes("message port closed")) {
-                console.error("Error loading states:", lastError.message || lastError);
-                // Indicate error state for all switches if loading fails
-                Object.values(switches).forEach(config => updateStatusText(config, false));
+            if (lastError || !data) {
+                console.error("Popup: Error loading states:", lastError?.message || "No data received");
+                 Object.values(switches).forEach(config => {
+                     if(config.el) config.el.checked = config.default;
+                     if(config.textEl && document.body.contains(config.textEl)) {
+                        config.textEl.textContent = (config.label || config.key) + (lastError ? " (讀取錯誤)" : " (無資料)");
+                        config.textEl.style.color = '#dc3545';
+                     }
+                     if(config.el && config.parentKey) config.el.disabled = true;
+                });
                 return;
             }
-            if (!data) {
-                console.error("Failed to retrieve data from storage (data is null/undefined).");
-                 Object.values(switches).forEach(config => updateStatusText(config, false));
-                 return;
-            }
 
-            console.log("Loaded states from storage:", data);
+            console.log("Popup: Loaded states:", data);
 
-            // --- Initial UI Update Loop ---
-            // Set the '.checked' state and text for each switch based on loaded data
-            Object.entries(switches).forEach(([key, config]) => {
+            // --- Phase 1: Set '.checked' states ---
+            console.log("Popup: Phase 1 - Setting initial checked states...");
+            Object.values(switches).forEach(config => {
                 if (config.el) {
-                    // Use loaded value if available, otherwise fallback to default
-                    const isEnabled = typeof data[config.key] !== 'undefined' ? data[config.key] : config.default;
-                    config.el.checked = isEnabled;
-                    updateStatusText(config, isEnabled);
+                    const loadedValue = data[config.key];
+                    config.el.checked = typeof loadedValue === 'boolean' ? loadedValue : config.default;
                 }
             });
 
-            // --- Post-Load UI Consistency Checks ---
-            // These checks ensure the popup UI is consistent even if the stored states
-            // were somehow left inconsistent (e.g., child ON, parent OFF).
-
-            // 1. Sync NextDay / NextDayAutoStart UI
-            const nextDayState = switches.nextDay.el.checked;
-            const autoStartSwitch = switches.nextDayAutoStart.el;
-            const autoStartConfig = switches.nextDayAutoStart;
-            if (autoStartSwitch) {
-                // If AutoStart is ON but NextDay is OFF, force NextDay ON (in UI)
-                if (autoStartSwitch.checked && !nextDayState) {
-                    console.log("Initial load UI sync: Forcing 'NextDay' ON because 'AutoStart' is ON.");
-                    switches.nextDay.el.checked = true;
-                    updateStatusText(switches.nextDay, true);
-                    // Note: We don't save here, load is just for initial display consistency.
-                }
-                // If NextDay is OFF but AutoStart is ON, force AutoStart OFF (in UI)
-                // (This takes precedence over the above rule if both are inconsistent)
-                 if (!nextDayState && autoStartSwitch.checked) {
-                     console.log("Initial load UI sync: Forcing 'AutoStart' OFF because 'NextDay' is OFF.");
-                    autoStartSwitch.checked = false;
-                    updateStatusText(autoStartConfig, false);
-                 }
-                 // If NextDay is ON but AutoStart is OFF (this is valid, no sync needed)
-            }
-
-
-            // 2. Sync Master / Children UI
-            const masterSwitch = switches.master.el;
-            if (masterSwitch) {
-                let isAnyChildOn = false;
-                let areAllChildrenOff = true;
-                Object.entries(switches).forEach(([key, config]) => {
-                    if (key !== 'master' && config.el && config.el.checked) {
-                        isAnyChildOn = true;
-                        areAllChildrenOff = false;
+            // --- Phase 2: Update UI (Text, Disabled State) ---
+            console.log("Popup: Phase 2 - Updating UI elements...");
+            Object.values(switches).forEach(config => {
+                if (config.el) {
+                    if (config.parentKey) {
+                        updateChildSwitchUI(config);
+                    } else {
+                        updateStatusText(config, config.el.checked);
                     }
-                });
+                }
+            });
 
-                // If Master is OFF but at least one child is ON, force Master ON (in UI)
-                if (!masterSwitch.checked && isAnyChildOn) {
-                    console.log("Initial load UI sync: Forcing Master ON because children are ON.");
-                    masterSwitch.checked = true;
-                    updateStatusText(switches.master, true);
-                     // Note: No save during load.
-                }
-                // If Master is ON but ALL children are OFF, force Master OFF (in UI)
-                else if (masterSwitch.checked && areAllChildrenOff) {
-                    console.log("Initial load UI sync: Forcing Master OFF because all children are OFF.");
-                     masterSwitch.checked = false;
-                     updateStatusText(switches.master, false);
-                      // Note: No save during load.
-                }
-            }
-             console.log("Initial UI states updated and synced.");
+            // --- Phase 3: Sync Master Switch UI ---
+            console.log("Popup: Phase 3 - Syncing Master Switch UI...");
+            syncMasterSwitchUI(false); // Update visual state only
+
+            console.log("Popup: Initial UI load complete.");
         });
     }
 
-    // Saves a specific key-value pair to chrome.storage.sync
     function saveState(key, value, callback) {
         chrome.storage.sync.set({ [key]: value }, () => {
             const lastError = chrome.runtime.lastError;
-            // Handle and log potential storage write errors
              if (lastError && !lastError.message?.includes("message port closed")) {
-                console.error(`Error saving state for ${key}:`, lastError.message || lastError);
-                // Try to update the status text to reflect the error for the specific switch
-                const config = Object.values(switches).find(c => c.key === key);
-                if (config) updateStatusText(config, value); // Update text even on error
-             } else if (!lastError) {
-                // Log success only if no error occurred
-                console.log(`State saved: ${key} = ${value}`);
+                console.error(`Popup: Error saving state for ${key}:`, lastError.message || lastError);
              }
-             // Execute callback if provided (and popup didn't close)
              if (typeof callback === 'function') {
                  if (!lastError || !lastError.message?.includes("message port closed")) {
-                    callback(lastError); // Pass error object (or null) to callback
-                 } else {
-                    console.log("Popup likely closed during save, skipping callback for", key);
+                    callback(lastError);
                  }
              }
         });
+    }
+
+    function syncMasterSwitchUI(shouldSave = true) {
+        const masterConfig = switches.master;
+        if (!masterConfig?.el || !document.body.contains(masterConfig.el)) return false;
+
+        const masterSwitch = masterConfig.el;
+        let isAnyFeatureOn = false;
+        Object.values(switches).forEach(config => {
+            if (!config.parentKey && config.key !== masterConfig.key && config.el?.checked) {
+                isAnyFeatureOn = true;
+            }
+        });
+
+        let masterStateChanged = false;
+        const currentMasterState = masterSwitch.checked;
+        let newMasterState = currentMasterState;
+
+        if (currentMasterState && !isAnyFeatureOn) newMasterState = false;
+        else if (!currentMasterState && isAnyFeatureOn) newMasterState = true;
+
+        if (newMasterState !== currentMasterState) {
+            masterStateChanged = true;
+            masterSwitch.checked = newMasterState;
+            updateStatusText(masterConfig, newMasterState);
+            console.log(`Popup: Sync Master UI -> ${newMasterState ? 'ON' : 'OFF'}`);
+
+            if (shouldSave) {
+                console.log(`Popup: Sync Master - Saving new state: ${newMasterState}`);
+                saveState(masterConfig.key, newMasterState);
+            }
+
+            // Re-sync children UI after master changes
+            Object.values(switches).forEach(childConfig => {
+                 if (childConfig.parentKey) updateChildSwitchUI(childConfig);
+             });
+        }
+        return masterStateChanged;
     }
 
     // --- Load Initial States ---
     loadAllStates();
 
-    // --- Add Event Listeners to all Switches ---
-    Object.entries(switches).forEach(([key, config]) => {
+    // --- Add Event Listeners ---
+    console.log("Popup: Setting up event listeners...");
+    Object.values(switches).forEach(config => {
         if (config.el) {
             config.el.addEventListener('change', () => {
+                if (!config.el || !document.body.contains(config.el)) return; // Element gone?
+
                 const newState = config.el.checked;
-                const changedKey = config.key; // The key of the switch that was toggled
+                const changedKey = config.key;
+                console.log(`\nPopup: Switch change: ${config.label} (${changedKey}) -> ${newState}`);
 
-                console.log(`Switch change detected: ${config.label} (${changedKey}) set to ${newState}`);
+                // --- 1. Save Toggled Switch State ---
+                saveState(changedKey, newState, (error) => {
+                    // Update text for this switch in the callback
+                     let parentIsEnabled = !config.parentKey || switches[config.parentKey]?.el?.checked;
+                     updateStatusText(config, newState, parentIsEnabled);
+                });
 
-                let masterStateMayChange = false; // Flag to track if master needs saving later
-                let masterFinalState = switches.master.el.checked; // Store potential future master state
-
-                // --- Synchronization Logic ---
-
-                // 1. Handle Master Switch Toggled Directly
-                if (changedKey === switches.master.key) {
-                    console.log(`Sync: Master toggled directly to ${newState}. Applying to children.`);
-                    // Master switch controls all children
+                // --- 2. Synchronization Logic ---
+                if (changedKey === switches.master.key) { // Master Toggled
+                    console.log("Popup: Sync - Master Toggled. Applying to features...");
                     Object.values(switches).forEach(childConfig => {
-                        // Update child only if it's not the master and its state differs
-                        if (childConfig.key !== switches.master.key && childConfig.el && childConfig.el.checked !== newState) {
-                            console.log(`  - Setting ${childConfig.label} to ${newState}`);
-                            childConfig.el.checked = newState;
-                            // Save each child's state
-                            saveState(childConfig.key, newState, (err) => updateStatusText(childConfig, newState));
-                        }
-                    });
-                    // Finally, save the master state itself
-                     saveState(changedKey, newState, (error) => {
-                         updateStatusText(config, newState); // Update master text
-                    });
-                }
-                // 2. Handle Child Switch Toggled
-                else {
-                    // First, save the state of the child that was actually clicked
-                    console.log(`Sync: Saving state for toggled child: ${config.label} (${changedKey}) = ${newState}`);
-                    saveState(changedKey, newState, (error) => {
-                         updateStatusText(config, newState); // Update child text
-                    });
-
-                    // 2a. Handle NextDay <-> NextDayAutoStart Dependency
-                    if (changedKey === switches.nextDay.key) { // If 'Next Day' was toggled
-                        const autoStartConfig = switches.nextDayAutoStart;
-                        // If 'Next Day' was turned OFF, turn 'Auto Start' OFF too
-                        if (!newState && autoStartConfig.el.checked) {
-                            console.log(`Sync: 'NextDay' OFF -> 'AutoStart' OFF`);
-                            autoStartConfig.el.checked = false;
-                            saveState(autoStartConfig.key, false, (err) => updateStatusText(autoStartConfig, false));
-                        }
-                    } else if (changedKey === switches.nextDayAutoStart.key) { // If 'Auto Start' was toggled
-                         const parentConfig = switches.nextDay;
-                        // If 'Auto Start' was turned ON, ensure 'Next Day' is ON too
-                        if (newState && !parentConfig.el.checked) {
-                            console.log(`Sync: 'AutoStart' ON -> 'NextDay' ON`);
-                            parentConfig.el.checked = true;
-                            saveState(parentConfig.key, true, (err) => updateStatusText(parentConfig, true));
-                        }
-                    }
-
-                    // 2b. Handle Child -> Master Dependency
-                    const masterConfig = switches.master;
-                    const masterSwitch = masterConfig.el;
-
-                    if (newState === true) { // If a child was turned ON...
-                        if (!masterSwitch.checked) { // ...and Master is currently OFF...
-                            console.log(`Sync: Child '${config.label}' ON -> Master ON (UI)`);
-                            masterSwitch.checked = true; // ...turn Master ON (in UI only for now)
-                            updateStatusText(masterConfig, true);
-                            masterStateMayChange = true; // Mark master state for saving later
-                            masterFinalState = true;
-                        }
-                    } else { // If a child was turned OFF...
-                        // Check if ALL children are now OFF (check current UI state)
-                        let areAllChildrenNowOff = true;
-                        Object.values(switches).forEach(c => {
-                            if (c.key !== masterConfig.key && c.el && c.el.checked) {
-                                areAllChildrenNowOff = false;
+                        if (!childConfig.parentKey && childConfig.key !== switches.master.key && childConfig.el) {
+                            if (childConfig.el.checked !== newState) {
+                                childConfig.el.checked = newState;
+                                saveState(childConfig.key, newState, (err) => updateStatusText(childConfig, newState)); // Save & update feature text
                             }
-                        });
-
-                        if (areAllChildrenNowOff && masterSwitch.checked) { // If all children are OFF and Master is ON...
-                            console.log(`Sync: Last Child '${config.label}' OFF -> Master OFF (UI)`);
-                            masterSwitch.checked = false; // ...turn Master OFF (in UI only for now)
-                            updateStatusText(masterConfig, false);
-                            masterStateMayChange = true; // Mark master state for saving later
-                            masterFinalState = false;
+                            // Update UI of this feature's children
+                            Object.values(switches).forEach(subConfig => {
+                                if (subConfig.parentKey === childConfig.key) updateChildSwitchUI(subConfig);
+                            });
+                        }
+                    });
+                } else if (!config.parentKey) { // Feature Toggled
+                    console.log(`Popup: Sync - Feature '${config.label}' Toggled. Updating children UI...`);
+                    Object.values(switches).forEach(subConfig => {
+                        if (subConfig.parentKey === changedKey && subConfig.el) {
+                            updateChildSwitchUI(subConfig); // Update sub-option UI (disabled state/text)
+                            // Special case: Turn off dependent sub-option if feature turns off
+                            if (!newState && subConfig.key === switches.nextDayAutoStart.key && subConfig.el.checked) {
+                                console.log(`Popup: Sync - Forcing '${subConfig.label}' OFF.`);
+                                subConfig.el.checked = false;
+                                saveState(subConfig.key, false, (err) => updateChildSwitchUI(subConfig)); // Save & update UI
+                            }
+                        }
+                    });
+                    syncMasterSwitchUI(true); // Sync master state (and save if needed)
+                } else { // Sub-Option Toggled
+                    console.log(`Popup: Sync - Sub-switch '${config.label}' Toggled.`);
+                    // Special case: Force parent ON if required sub-option turned ON
+                    if (newState && config.key === switches.nextDayAutoStart.key) {
+                        const parentConfig = switches[config.parentKey];
+                        if (parentConfig?.el && !parentConfig.el.checked) {
+                            console.log(`Popup: Sync - Forcing parent '${parentConfig.label}' ON.`);
+                            parentConfig.el.checked = true;
+                            saveState(parentConfig.key, true, (err) => {
+                                updateStatusText(parentConfig, true); // Update parent text
+                                updateChildSwitchUI(config); // Re-update child (now enabled)
+                                syncMasterSwitchUI(true); // Re-sync master
+                            });
                         }
                     }
-
-                     // 2c. Save Master State if Changed Indirectly by a Child Toggle
-                     if (masterStateMayChange) {
-                         console.log(`Sync: Saving potentially changed Master state: ${masterFinalState}`);
-                         saveState(masterConfig.key, masterFinalState, (err) => { /* Master text already updated */ });
-                     }
                 }
-
-                // --- User Feedback & Known Issues ---
-                // Add a note if the problematic feature's state was changed.
-                if (changedKey === switches.nextDay.key || changedKey === switches.master.key) {
-                     console.warn("Note: Changes to 'Master' or '自動完成隔日' state saved. However, due to content script limitations, the '自動完成隔日' feature might not fully stop/start its background checks immediately or correctly on the page.");
-                }
-
-            }); // End event listener callback
+                 console.log(`Popup: Event processing finished for ${changedKey}`);
+            });
+        } else {
+            console.warn(`Popup: Element not found for listener setup: ${config.key}`);
         }
-    }); // End Object.entries loop
-
-}); // End DOMContentLoaded
+    });
+    console.log("Popup: Event listeners attached.");
+});

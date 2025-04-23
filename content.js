@@ -1,98 +1,151 @@
 // --- Feature State Management ---
 let featureStates = {
-    masterEnabled: true, // Default values matching popup.js
+    masterEnabled: true,
     featureFileScanEnabled: true,
     featureBoxScanEnabled: true,
     featureQueueingEnabled: true,
+    featureQueueingAction: true, // Default: true = click
     featureNextDayEnabled: true,
     featureNextDayAutoStartEnabled: true,
-    featureCheckoutEnabled: true
+    featureCheckoutEnabled: true,
+    featureCheckoutAction: true, // Default: true = click
 };
 
 // Function to load initial states from storage
 function loadFeatureStates() {
-    const keysToGet = Object.keys(featureStates); // Get all keys we track
+    const keysToGet = Object.keys(featureStates);
     chrome.storage.sync.get(keysToGet, (data) => {
         if (chrome.runtime.lastError) {
             console.error("蝦皮自動化: Error loading feature states:", chrome.runtime.lastError);
             return;
         }
-        // Merge loaded data with defaults (overwriting defaults if data exists)
         featureStates = { ...featureStates, ...data };
         console.log("蝦皮自動化: Feature states loaded:", featureStates);
-        // Initial run of state change handler to apply loaded states (e.g., remove UI if needed)
-        handleFeatureStateChange(true); // Pass true for initial load
+        handleFeatureStateChange(true);
+        console.log("蝦皮自動化: Performing initial URL check/state reset.");
+        checkUrlAndResetStates(window.location.href, true); // Initial check
     });
 }
 
-// Listen for changes in storage (e.g., from popup)
+// Listen for changes in storage
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync') {
         let statesChanged = false;
         for (let key in changes) {
             if (featureStates.hasOwnProperty(key)) {
-                featureStates[key] = changes[key].newValue;
+                featureStates[key] = typeof changes[key].newValue === 'boolean' ? changes[key].newValue : featureStates[key];
                 statesChanged = true;
-                console.log(`蝦皮自動化: Feature state changed: ${key} = ${featureStates[key]}`);
+                // console.log(`蝦皮自動化: Feature state changed: ${key} = ${featureStates[key]}`); // Less verbose
             }
         }
         if (statesChanged) {
             console.log("蝦皮自動化: Updated feature states:", featureStates);
-            handleFeatureStateChange(false); // Pass false for subsequent changes
+            handleFeatureStateChange(false);
         }
     }
 });
 
-// Function to handle logic after state changes (e.g., re-init or cleanup)
+// Function to handle logic after state changes
 function handleFeatureStateChange(isInitialLoad = false) {
-    console.log("蝦皮自動化: Handling feature state change...");
-
+    // console.log("蝦皮自動化: Handling feature state change..."); // Less verbose
+    // ... (keep existing logic for File Scanner, Next Day UI, etc.) ...
     // --- File Scanner Handling ---
     if (featureStates.hasOwnProperty('featureFileScanEnabled')) {
-        if (!featureStates.featureFileScanEnabled) {
-            // If disabled, try to remove its UI
-            if (typeof window.removeShopeeFileScannerUI === 'function') {
-                window.removeShopeeFileScannerUI();
-            } else if (!isInitialLoad) { // Only log warning if not initial load (function might not exist yet)
-                console.warn("蝦皮自動化: Cannot call removeShopeeFileScannerUI (might not be initialized yet).");
-                 // Fallback removal attempt just in case
-                 document.getElementById('customFileInput_TWExtractor')?.remove();
-                 document.getElementById('customStatusSpan_TWExtractor')?.remove();
-                 document.getElementById('html5qrReaderDiv_TWExtractor')?.remove();
-            }
-        } else {
-            // If enabled, trigger its internal check (which includes URL check)
-            if (typeof window.triggerShopeeFileScannerCheck === 'function') {
-                window.triggerShopeeFileScannerCheck();
-            } else if (!isInitialLoad) {
-                console.warn("蝦皮自動化: Cannot call triggerShopeeFileScannerCheck (might not be initialized yet).");
-            }
-        }
+         if (!featureStates.featureFileScanEnabled) { if (typeof window.removeShopeeFileScannerUI === 'function') { window.removeShopeeFileScannerUI(); } else if (!isInitialLoad) { /* console.warn("...") */ } } else { if (typeof window.triggerShopeeFileScannerCheck === 'function') { window.triggerShopeeFileScannerCheck(); } else if (!isInitialLoad) { /* console.warn("...") */} }
     }
-
     // --- Next Day Feature UI Handling ---
-    if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
-        if (!featureStates.featureNextDayEnabled) {
-            removeNextDayCheckbox(); // Ensure its checkbox is removed if main feature disabled
-        }
-        // If enabled, the interval will handle adding it back if on the correct URL
-    }
-
+    if (featureStates.hasOwnProperty('featureNextDayEnabled')) { if (!featureStates.featureNextDayEnabled) { removeNextDayCheckbox(); } }
     // --- Next Day Sub-Option UI Consistency ---
-     if (featureStates.hasOwnProperty('featureNextDayAutoStartEnabled')) {
-        const nextDayCheckbox = document.getElementById('status'); // The sub-option checkbox ID
-        if (nextDayCheckbox && nextDayCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) {
-            // Sync checkbox state if it exists and doesn't match storage
-             console.log("蝦皮自動化: Syncing '自動開始下一筆' checkbox state.");
-            nextDayCheckbox.checked = featureStates.featureNextDayAutoStartEnabled;
-        }
-    }
-     console.log("蝦皮自動化: Feature state handling complete.");
+     if (featureStates.hasOwnProperty('featureNextDayAutoStartEnabled')) { const nextDayCheckbox = document.getElementById('status'); if (nextDayCheckbox && nextDayCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) { /* console.log("...") */ nextDayCheckbox.checked = featureStates.featureNextDayAutoStartEnabled; } }
+    // console.log("蝦皮自動化: Feature state handling complete."); // Less verbose
 }
 
+// --- Shared URL Monitoring and State Management ---
+let currentUrl = window.location.href;
+let checkoutActionPerformed = false; // Flag for Checkout Action Lock
+
+// *** IMPORTANT: VERIFY THIS URL CAREFULLY! ***
+// Go to the page, press F12, type `window.location.href` in console, copy the result.
+const CHECKOUT_TARGET_URL = 'https://sp.spx.shopee.tw/outbound-management/self-collection-outbound/'; // <<< ADJUST THIS URL
+
+function checkUrlAndResetStates(newUrl, isInitialLoad = false) {
+    const isOnTargetUrl = newUrl.startsWith(CHECKOUT_TARGET_URL);
+    const previousUrlWasTarget = currentUrl.startsWith(CHECKOUT_TARGET_URL);
+
+    if (!isInitialLoad) {
+        console.log(`蝦皮自動化: URL change detected. From: ${currentUrl} | To: ${newUrl}`);
+        console.log(`蝦皮自動化: URL Check - Is new URL target? ${isOnTargetUrl}. Was previous URL target? ${previousUrlWasTarget}.`);
+    } else {
+         console.log(`蝦皮自動化: Initial Load Check - Current URL: ${newUrl}. Is target? ${isOnTargetUrl}.`);
+    }
+
+
+    // --- Reset Checkout Action Flag Logic ---
+    let needsReset = false;
+    if (isInitialLoad) {
+        // On initial load, only reset if we are NOT on the target URL
+        if (!isOnTargetUrl) {
+            needsReset = true;
+            // console.log(`蝦皮自動化: Flag Reset Logic (Initial Load) - Not on target, reset needed.`);
+        } else {
+             // console.log(`蝦皮自動化: Flag Reset Logic (Initial Load) - On target, no reset needed yet.`);
+        }
+    } else { // Subsequent URL changes
+        // Reset if we navigated *away* from the target page
+        if (previousUrlWasTarget && !isOnTargetUrl) {
+             needsReset = true;
+              console.log(`蝦皮自動化: Flag Reset Logic (Nav Away) - Moved from target to non-target, reset needed.`);
+        }
+        // Also reset if we navigated *to* the target page (from a different page)
+        else if (!previousUrlWasTarget && isOnTargetUrl) {
+             needsReset = true;
+             console.log(`蝦皮自動化: Flag Reset Logic (Nav To) - Moved from non-target to target, reset needed.`);
+        }
+        // Add specific case: Refreshing the target page (URL stays the same but was target)
+        else if (isOnTargetUrl && newUrl === currentUrl && previousUrlWasTarget) {
+             needsReset = true; // Treat refresh like navigating to the page
+             console.log(`蝦皮自動化: Flag Reset Logic (Refresh) - Refreshed target page, reset needed.`);
+        }
+         else {
+            // console.log(`蝦皮自動化: Flag Reset Logic (No Change Relevant) - No relevant navigation for reset.`);
+        }
+    }
+
+    if (needsReset && checkoutActionPerformed) {
+        console.warn("蝦皮自動化: *** Resetting checkoutActionPerformed flag to FALSE. ***");
+        checkoutActionPerformed = false;
+    } else if (needsReset && !checkoutActionPerformed) {
+         console.log("蝦皮自動化: Flag reset condition met, but flag was already false.");
+    } else if (!needsReset && checkoutActionPerformed) {
+         console.log("蝦皮自動化: Flag reset condition NOT met, keeping flag TRUE.");
+    } else {
+        // console.log("蝦皮自動化: Flag reset condition NOT met, flag remains false.");
+    }
+
+
+    // --- Trigger URL-dependent features ---
+    // Make sure BoxScan check runs if its URL matches
+    urlChangedFunction_BoxScan(newUrl);
+
+    // Update the current URL tracking variable *after* all checks using the old `currentUrl`
+    currentUrl = newUrl;
+}
+
+// Single interval to check for URL changes
+const masterUrlCheckInterval = setInterval(() => {
+    const newUrl = window.location.href;
+    if (newUrl !== currentUrl) {
+        checkUrlAndResetStates(newUrl);
+    }
+    // Also run the checkout function periodically, the flag will prevent multiple actions
+    autoCheckout();
+
+}, 750); // Check slightly less often, maybe 750ms
+
 // --- Initial Load ---
-loadFeatureStates();
-// --- End Feature State Management ---
+loadFeatureStates(); // Also calls checkUrlAndResetStates initially
+// --- End Feature State Management & URL Monitoring ---
+
 
 // --- Feature 1: 自動刷取物流箱單 ---
 let currentUrl_BoxScan = window.location.href; // Use specific var name
@@ -151,21 +204,30 @@ setInterval(()=>{urlChangedFunction_BoxScan()},1000);
 
 // --- Feature 2: 自動叫號 ---
 function autoCallNumber() {
+    // Check Parent Toggle FIRST
     if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
-        console.log("蝦皮自動化: 自動叫號 disabled.");
+        // console.log("蝦皮自動化: 自動叫號 disabled."); // Less verbose logging
         return;
     }
     const currentUrl = window.location.href;
     if (currentUrl === 'https://sp.spx.shopee.tw/queueing-management/queueing-task') {
-        const buttons = document.querySelector('.ssc-btn-type-text'); // Use standard querySelector
-        if (buttons) {
-            buttons.click(); // Use standard click
-            console.warn('蝦皮自動化: 自動叫號 - 成功點擊');
+        const button = document.querySelector('.ssc-btn-type-text'); // Target the specific button more reliably if possible
+        if (button) {
+            // Check Action Toggle (true = click, false = focus)
+            if (featureStates.featureQueueingAction === true) {
+                button.click();
+                console.warn('蝦皮自動化: 自動叫號 - 成功點擊 (Clicked)');
+            } else {
+                button.focus(); // Apply focus instead of click
+                console.warn('蝦皮自動化: 自動叫號 - 成功聚焦 (Focused)');
+            }
         }
+        // else { console.log("蝦皮自動化: 自動叫號 - Button not found yet."); } // Less verbose
     }
 }
-setInterval(autoCallNumber, 1500); // Slightly longer interval might be safer
+setInterval(autoCallNumber, 1500);
 // --- End Feature 2 ---
+
 
 // --- Feature 3: 自動完成隔日 ---
 let nextDayIntervalId = null;
@@ -459,36 +521,86 @@ setInterval(()=>{startNextDayFeature()},1000);
 
 // --- Feature 4: 自動結帳 ---
 function autoCheckout() {
-    // Check Toggle
+    // DEBUG: Log entry into function
+    console.log("蝦皮自動化: --- autoCheckout() called ---");
+
+    // 1. Check Master/Feature Enablement
     if (!featureStates.masterEnabled || !featureStates.featureCheckoutEnabled) {
-        // console.log("蝦皮自動化: 自動結帳 disabled.");
+         console.log("蝦皮自動化: Checkout - Disabled by toggle.");
         return;
     }
+     // DEBUG: Log enabled state
+     console.log("蝦皮自動化: Checkout - Feature enabled.");
 
-    // Add URL Check - *Important*: Define which page(s) this should run on!
-    // Example: Only run on task list page? Adapt the URL check as needed.
-    const checkoutTargetUrl = 'https://sp.spx.shopee.tw/some/relevant/checkout/page'; // <<< ADJUST THIS URL
-    if (!window.location.href.startsWith(checkoutTargetUrl)) {
-         // console.log("蝦皮自動化: 自動結帳 - Not on target URL.");
-        // return; // Uncomment this return after setting the correct URL
+    // 2. Check if on the Target URL
+    const isOnCheckoutUrl = window.location.href.startsWith(CHECKOUT_TARGET_URL);
+    if (!isOnCheckoutUrl) {
+        console.log(`蝦皮自動化: Checkout - Not on target URL. Current: ${window.location.href} | Target: ${CHECKOUT_TARGET_URL}`);
+        return; // Exit silently if not on the right page
     }
+     // DEBUG: Log URL match
+     console.log(`蝦皮自動化: Checkout - On target URL: ${window.location.href}`);
 
+    // 3. Check if Action Already Performed for this page view
+    if (checkoutActionPerformed) {
+        console.log("蝦皮自動化: Checkout - Action already performed (lock is TRUE). Skipping.");
+        return; // Action already done, wait for URL change to reset lock
+    }
+     // DEBUG: Log lock state
+     console.log("蝦皮自動化: Checkout - Action not yet performed (lock is FALSE). Proceeding...");
 
+    // 4. Check for specific conditions/elements
+    //    (Keep your existing condition check, ensure it's reliable)
+    const operationButton = document.querySelector('.task-operation'); // *** MAKE THIS SELECTOR AS SPECIFIC AS POSSIBLE ***
     const rowCount = document.querySelectorAll('.ssc-table-row-normal').length;
-    const buttonCount = document.querySelectorAll('.ssc-btn-type-text').length; // Be specific if possible
+    const buttonCount = document.querySelectorAll('.ssc-btn-type-text').length; // Maybe too generic?
     const tableCount = document.querySelectorAll('.ssc-table-header-column-container').length;
-    const operationButton = document.querySelector('.task-operation'); // Be specific if possible
 
-    // Refine condition if necessary - this condition seems fragile.
-    if (rowCount > 0 && rowCount === buttonCount && operationButton && buttonCount * 2 == tableCount) {
-        console.log('蝦皮自動化: 自動結帳 - Conditions met, clicking button.');
-        operationButton.click();
+    // DEBUG: Log element search results
+    console.log(`蝦皮自動化: Checkout - Element Check: Operation Button found? ${!!operationButton}`);
+    console.log(`蝦皮自動化: Checkout - Condition Check: Rows=${rowCount}, Buttons=${buttonCount}, Headers=${tableCount}`);
+
+
+    // *** Refine condition carefully! This is often the point of failure. ***
+    // Maybe simplify: just check if the specific `.task-operation` button exists?
+    // const conditionsMet = !!operationButton; // Example simplified condition
+
+    // Using your original condition:
+    const conditionsMet = rowCount > 0 && rowCount === buttonCount && operationButton && buttonCount * 2 === tableCount;
+
+    if (conditionsMet) {
+        //console.warn('蝦皮自動化: Checkout - Conditions MET!');
+
+        // 5. Perform Action (Click or Focus)
+        const actionType = featureStates.featureCheckoutAction ? 'CLICK' : 'FOCUS';
+        //console.warn(`蝦皮自動化: Checkout - Performing action: ${actionType}`);
+
+        try {
+            if (featureStates.featureCheckoutAction === true) {
+                operationButton.click();
+            } else {
+                operationButton.focus();
+            }
+
+            // 6. Set the Flag *only after successful action*
+            console.warn('蝦皮自動化: Checkout - *** Action performed successfully, setting action lock to TRUE. ***');
+            checkoutActionPerformed = true;
+
+        } catch (error) {
+             console.error('蝦皮自動化: Checkout - Error during action execution:', error);
+             // Do NOT set the flag if the action failed
+        }
+
     } else {
-        // console.log('蝦皮自動化: 自動結帳 - Condition not met.');
-        // console.log(` Counts - Rows: ${rowCount}, Buttons: ${buttonCount}, Headers: ${tableCount}, OpButton: ${!!operationButton}`);
+        console.log('蝦皮自動化: Checkout - Conditions NOT met yet.');
     }
+    // console.log("蝦皮自動化: --- autoCheckout() finished ---");
 };
-setInterval(autoCheckout, 2000); // Check less frequently
+
+// Note: The autoCheckout function is now called by the masterUrlCheckInterval
+// No separate interval needed here anymore.
+// const checkoutInterval = setInterval(autoCheckout, 1000); // REMOVE or comment this out
+
 // --- End Feature 4 ---
 
 
