@@ -1,6 +1,4 @@
-// popup.js
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Define Switch Elements and Storage Keys ---
     const switches = {
         master: { el: document.getElementById('masterSwitch'), key: 'masterEnabled', textEl: document.getElementById('masterStatusText'), default: true, label: '所有功能' },
 
@@ -14,12 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         nextDay: { el: document.getElementById('featureNextDaySwitch'), key: 'featureNextDayEnabled', textEl: document.getElementById('featureNextDayStatusText'), default: true, label: '自動完成隔日' },
         nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureNextDayAutoStartContainer') },
-        oneItemPerBox: { el: document.getElementById('featureOneItemPerBoxSwitch'), key: 'featureOneItemPerBoxEnabled', textEl: document.getElementById('featureOneItemPerBoxStatusText'), default: true, label: '↳ 一件一箱自動聚焦', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureOneItemPerBoxContainer') }, // New switch config
+        oneItemPerBox: { el: document.getElementById('featureOneItemPerBoxSwitch'), key: 'featureOneItemPerBoxEnabled', textEl: document.getElementById('featureOneItemPerBoxStatusText'), default: true, label: '↳ 一件一箱自動裝箱', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureOneItemPerBoxContainer') },
 
         fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
     };
 
-    // --- Helper Functions ---
 
     function updateStatusText(switchConfig, isEnabled, parentIsEnabled = true) {
         if (!switchConfig?.textEl || !document.body.contains(switchConfig.textEl)) {
@@ -62,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const parentConfig = Object.values(switches).find(p => p.key === childConfig.parentKey);
-        const parentIsEnabled = parentConfig?.el?.checked ?? true; 
+        const parentIsEnabled = parentConfig?.el?.checked ?? true;
 
         childConfig.el.disabled = !parentIsEnabled;
         updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
@@ -89,9 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            console.log("Popup: Loaded states:", data);
-
-            console.log("Popup: Phase 1 - Setting initial checked states...");
             Object.values(switches).forEach(config => {
                 if (config.el) {
                     const loadedValue = data[config.key];
@@ -99,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            console.log("Popup: Phase 2 - Updating UI elements...");
             Object.values(switches).forEach(config => {
                 if (config.el) {
                     if (config.parentKey) {
@@ -109,25 +102,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-
-            console.log("Popup: Phase 3 - Syncing Master Switch UI...");
-            syncMasterSwitchUI(false); 
-
-            console.log("Popup: Initial UI load complete.");
+            syncMasterSwitchUI(false);
         });
     }
 
     function saveState(key, value, callback) {
         chrome.storage.sync.set({ [key]: value }, () => {
             const lastError = chrome.runtime.lastError;
-             if (lastError && !lastError.message?.includes("message port closed")) {
+            if (lastError && !lastError.message?.includes("message port closed")) {
                 console.error(`Popup: Error saving state for ${key}:`, lastError.message || lastError);
-             }
-             if (typeof callback === 'function') {
-                 if (!lastError || !lastError.message?.includes("message port closed")) {
+            }
+            if (typeof callback === 'function') {
+                if (!lastError || !lastError.message?.includes("message port closed")) {
                     callback(lastError);
-                 }
-             }
+                }
+            }
         });
     }
 
@@ -154,87 +143,54 @@ document.addEventListener('DOMContentLoaded', () => {
             masterStateChanged = true;
             masterSwitch.checked = newMasterState;
             updateStatusText(masterConfig, newMasterState);
-            console.log(`Popup: Sync Master UI -> ${newMasterState ? 'ON' : 'OFF'}`);
-
             if (shouldSave) {
-                console.log(`Popup: Sync Master - Saving new state: ${newMasterState}`);
                 saveState(masterConfig.key, newMasterState);
             }
-
             Object.values(switches).forEach(childConfig => {
-                 if (childConfig.parentKey) updateChildSwitchUI(childConfig);
-             });
+                if (childConfig.parentKey) updateChildSwitchUI(childConfig);
+            });
         }
         return masterStateChanged;
     }
 
     loadAllStates();
 
-    console.log("Popup: Setting up event listeners...");
     Object.values(switches).forEach(config => {
         if (config.el) {
             config.el.addEventListener('change', () => {
-                if (!config.el || !document.body.contains(config.el)) return; 
+                if (!config.el || !document.body.contains(config.el)) return;
 
                 const newState = config.el.checked;
                 const changedKey = config.key;
-                console.log(`\nPopup: Switch change: ${config.label} (${changedKey}) -> ${newState}`);
 
                 saveState(changedKey, newState, (error) => {
-                     let parentIsEnabled = !config.parentKey || switches[config.parentKey]?.el?.checked;
-                     updateStatusText(config, newState, parentIsEnabled);
+                    let parentIsEnabled = !config.parentKey || switches[config.parentKey]?.el?.checked;
+                    updateStatusText(config, newState, parentIsEnabled);
                 });
 
-                if (changedKey === switches.master.key) { 
-                    console.log("Popup: Sync - Master Toggled. Applying to features...");
+                if (changedKey === switches.master.key) {
                     Object.values(switches).forEach(childConfig => {
                         if (!childConfig.parentKey && childConfig.key !== switches.master.key && childConfig.el) {
                             if (childConfig.el.checked !== newState) {
                                 childConfig.el.checked = newState;
-                                saveState(childConfig.key, newState, (err) => updateStatusText(childConfig, newState)); 
+                                saveState(childConfig.key, newState, (err) => updateStatusText(childConfig, newState));
                             }
                             Object.values(switches).forEach(subConfig => {
                                 if (subConfig.parentKey === childConfig.key) updateChildSwitchUI(subConfig);
                             });
                         }
                     });
-                } else if (!config.parentKey) { 
-                    console.log(`Popup: Sync - Feature '${config.label}' Toggled. Updating children UI...`);
+                } else if (!config.parentKey) {
                     Object.values(switches).forEach(subConfig => {
                         if (subConfig.parentKey === changedKey && subConfig.el) {
-                            updateChildSwitchUI(subConfig); 
-                            if (!newState && (subConfig.key === switches.nextDayAutoStart.key || subConfig.key === switches.oneItemPerBox.key) && subConfig.el.checked) { // Also turn off oneItemPerBox
-                                console.log(`Popup: Sync - Forcing '${subConfig.label}' OFF because parent '${config.label}' is OFF.`);
-                                subConfig.el.checked = false;
-                                saveState(subConfig.key, false, (err) => updateChildSwitchUI(subConfig)); 
-                            }
+                             updateChildSwitchUI(subConfig);
                         }
                     });
-                    syncMasterSwitchUI(true); 
-                } else { 
-                    console.log(`Popup: Sync - Sub-switch '${config.label}' Toggled.`);
-                    if (newState && (config.key === switches.nextDayAutoStart.key || config.key === switches.oneItemPerBox.key)) { // If nextDayAutoStart or oneItemPerBox is turned ON
-                        const parentConfig = switches[config.parentKey]; // parentKey is 'nextDay'
-                        if (parentConfig?.el && !parentConfig.el.checked) {
-                            console.log(`Popup: Sync - Forcing parent '${parentConfig.label}' ON because sub-option '${config.label}' was enabled.`);
-                            parentConfig.el.checked = true;
-                            saveState(parentConfig.key, true, (err) => {
-                                updateStatusText(parentConfig, true); 
-                                updateChildSwitchUI(config); 
-                                // Also ensure other children of 'nextDay' are correctly updated
-                                Object.values(switches).forEach(otherSub => {
-                                    if (otherSub.parentKey === parentConfig.key) updateChildSwitchUI(otherSub);
-                                });
-                                syncMasterSwitchUI(true); 
-                            });
-                        }
-                    }
+                    syncMasterSwitchUI();
+                } else {
+                    syncMasterSwitchUI();
                 }
-                 console.log(`Popup: Event processing finished for ${changedKey}`);
             });
-        } else {
-            console.warn(`Popup: Element not found for listener setup: ${config.key}`);
         }
     });
-    console.log("Popup: Event listeners attached.");
 });
