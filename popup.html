@@ -7,9 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h3>蝦皮自動化工具 v3.11.1</h3> <!-- Version bump -->
-    <hr>
-    <!-- Master Switch -->
+    <h3>蝦皮自動化工具 v3.11.2</h3> <hr>
     <div class="setting master-switch">
         <label class="switch">
             <input type="checkbox" id="masterSwitch">
@@ -19,10 +17,8 @@
     </div>
     <hr>
 
-    <!-- Individual Features -->
     <h4>功能開關:</h4>
 
-     <!-- 自動叫號 -->
      <div class="setting">
         <label class="switch">
             <input type="checkbox" id="featureQueueingSwitch">
@@ -30,16 +26,14 @@
         </label>
         <span id="featureQueueingStatusText">自動叫號</span>
     </div>
-    <!-- Sub-option for 自動叫號 Action -->
     <div class="setting sub-setting" id="featureQueueingActionContainer">
          <label class="switch small-switch">
-            <input type="checkbox" id="featureQueueingActionSwitch"> <!-- New ID -->
+            <input type="checkbox" id="featureQueueingActionSwitch">
             <span class="slider round"></span>
         </label>
-        <span id="featureQueueingActionStatusText">↳ 動作: 點擊 / 聚焦</span> <!-- New ID -->
+        <span id="featureQueueingActionStatusText">↳ 動作: 點擊 / 聚焦</span>
     </div>
 
-    <!-- 自動結帳 -->
     <div class="setting">
         <label class="switch">
             <input type="checkbox" id="featureCheckoutSwitch">
@@ -47,16 +41,14 @@
         </label>
         <span id="featureCheckoutStatusText">自動結帳</span>
     </div>
-    <!-- Sub-option for 自動結帳 Action -->
     <div class="setting sub-setting" id="featureCheckoutActionContainer">
          <label class="switch small-switch">
-            <input type="checkbox" id="featureCheckoutActionSwitch"> <!-- New ID -->
+            <input type="checkbox" id="featureCheckoutActionSwitch">
             <span class="slider round"></span>
         </label>
-        <span id="featureCheckoutActionStatusText">↳ 動作: 點擊 / 聚焦</span> <!-- New ID -->
+        <span id="featureCheckoutActionStatusText">↳ 動作: 點擊 / 聚焦</span>
     </div>
 
-    <!-- Other features -->
     <div class="setting">
         <label class="switch">
             <input type="checkbox" id="featureBoxScanSwitch">
@@ -71,14 +63,21 @@
         </label>
         <span id="featureNextDayStatusText">自動完成隔日</span>
     </div>
-    <!-- Sub-option for Next Day -->
-    <div class="setting sub-setting" id="featureNextDayAutoStartContainer"> <!-- Added ID for consistency -->
+    <div class="setting sub-setting" id="featureNextDayAutoStartContainer">
          <label class="switch small-switch">
             <input type="checkbox" id="featureNextDayAutoStartSwitch">
             <span class="slider round"></span>
         </label>
         <span id="featureNextDayAutoStartStatusText">↳ 自動開始下一筆</span>
     </div>
+    <div class="setting sub-setting" id="featureOneItemPerBoxContainer">
+         <label class="switch small-switch">
+            <input type="checkbox" id="featureOneItemPerBoxSwitch">
+            <span class="slider round"></span>
+        </label>
+        <span id="featureOneItemPerBoxStatusText">↳ 一件一箱自動聚焦</span>
+    </div>
+
     <div class="setting">
         <label class="switch">
             <input type="checkbox" id="featureFileScanSwitch">
