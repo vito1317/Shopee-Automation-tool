@@ -1,4 +1,3 @@
-// content.js
 let featureStates = {
     masterEnabled: true,
     featureFileScanEnabled: true,
@@ -53,13 +52,9 @@ function handleFeatureStateChange(isInitialLoad = false) {
 
     if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
         if (!featureStates.featureNextDayEnabled) {
-            removeNextDayCheckbox();
-            removeOneItemPerBoxCheckbox();
+            stopNextDayFeature();
         } else {
-             if (window.location.href.includes('https://sp.spx.shopee.tw/outbound-management/pack-to/detail/')) {
-                addOrUpdateNextDayCheckbox();
-                addOrUpdateOneItemPerBoxCheckbox();
-            }
+            startNextDayFeature();
         }
     }
 
@@ -1202,11 +1197,9 @@ function autoCheckout() {
                         if (currentFeatureStates.masterEnabled && currentFeatureStates.featureFileScanEnabled) {
                             updateStatusSpan(statusPrefix + `PDF文字條碼處理完成 (${foundTextCodes.size}個).`, 'green', true);
                         }
-                         // resolve(); // 如果希望文字提取後就結束，則取消註解此行並註解下面的QR掃描部分
-                         // return;
                     }
 
-                    if (foundTextCodes.size === 0) { // 只有在文字中未找到時才掃描QR
+                    if (foundTextCodes.size === 0) {
                         updateStatusSpan(statusPrefix + `PDF文字中未找到條碼，嘗試掃描QR碼..`, 'grey');
                         await processBarcodesAndQRCodes(pdfDoc, processedCodesThisFile, statusPrefix, fileNameForReport);
                     }
