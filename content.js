@@ -1018,7 +1018,7 @@ function autoCheckout() {
                 } catch (err) {
                     const msgL = (err?.message || '').toLowerCase();
                     let eType = 'Scan Err', color='orange';
-                    if(msgL.includes("not found") || msgL.includes("unable to find") || msgL.includes("no qr code found")){ eType='Not Found'; color='grey'; }
+                    if(msgL.includes("not found") || msgL.includes("unable to find") || msgL.includes("no qr code found") || msgL.includes("multiformat")){ eType='Not Found'; color='grey'; }
                     else if(msgL.includes("canvas")||msgL.includes("toblob")){ eType='Canvas Err'; }
                     addBatchScanError(fileNameForReport, pgNum, '整頁 QR', eType, err.message || String(err));
                     updateStatusSpan(statusPrefix + `第${pgNum}頁(整頁QR):❗${eType}`, color);
@@ -1078,7 +1078,7 @@ function autoCheckout() {
                             const detsQ = qErr.message || String(qErr);
                             if (!ignored) {
                                 let eType = 'Scan Err', color='orange';
-                                if(msgLQ.includes("not found") || msgLQ.includes("unable to find") || msgLQ.includes("no qr code found")){ eType='Not Found'; color='grey';}
+                                if(msgLQ.includes("not found") || msgLQ.includes("unable to find") || msgLQ.includes("no qr code found") || msgLQ.includes("multiformat")){ eType='Not Found'; color='grey';}
                                 else if(msgLQ.includes("canvas")||msgLQ.includes("toblob")){ eType='Canvas Err';}
                                 addBatchScanError(fileNameForReport, pgNum, q.n + ' QR', eType, detsQ);
                                 updateStatusSpan(statusPrefix + `第${pgNum}頁(${q.n} QR):❗${eType}`, color);
@@ -1294,47 +1294,158 @@ function autoCheckout() {
 
     async function processImageFile(file, statusPrefix, fileNameForReport) {
         let currentFeatureStates = await getFeatureStatesFromContent();
-        if(!currentFeatureStates.masterEnabled||!currentFeatureStates.featureFileScanEnabled){
-            addBatchScanError(fileNameForReport,null,'Image','Cancelled','功能已停用'); return;
+        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+            addBatchScanError(fileNameForReport, null, 'Image', 'Cancelled', '功能已停用');
+            return;
         }
         updateStatusSpan(statusPrefix + '掃描圖像QR..', 'grey');
+
         const readerEl = document.getElementById(`${SCRIPT_PREFIX}_html5qrReaderDiv`);
         if (typeof Html5Qrcode === 'undefined' || !readerEl) {
-             addBatchScanError(fileNameForReport, null, 'Image Scan', 'Setup Err', 'QR掃描器未就緒');
-             updateStatusSpan(statusPrefix + "QR掃描器未就緒", "orange");
-             return;
+            addBatchScanError(fileNameForReport, null, 'Image Scan', 'Setup Err', 'QR掃描器未就緒');
+            updateStatusSpan(statusPrefix + "QR掃描器未就緒", "orange");
+            return;
         }
+
         let qr;
         try {
-             qr = new Html5Qrcode(readerEl.id);
+            qr = new Html5Qrcode(readerEl.id);
         } catch (qrInitErr) {
             addBatchScanError(fileNameForReport, null, 'Image QR Init', 'Init Fail', qrInitErr.message || String(qrInitErr));
             updateStatusSpan(statusPrefix + "QR掃描器初始化失敗", "red");
             return;
         }
 
-        try {
-            const result = await qr.scanFile(file, false);
-            const txt = result?.decodedText?.trim() || (typeof result === 'string' ? result.trim() : null);
-            if (txt && /^TW[A-Z0-9]{13}$/.test(txt)) {
-                await simulateBarcodeInput(txt, fileNameForReport);
-                totalSimulatedInBatch++;
-                updateStatusSpan(statusPrefix + `圖像QR掃描成功: ${txt.substring(0,6)}...`, 'green');
-            } else if (txt) {
-                addBatchScanError(fileNameForReport, null, 'Image QR', 'Invalid Format', `'${txt.substring(0,10)}...'`);
-                updateStatusSpan(statusPrefix + `圖像QR無效: ${txt.substring(0,10)}...`, 'orange');
-            } else {
-                addBatchScanError(fileNameForReport, null, 'Image QR', 'Not Found', '');
-                updateStatusSpan(statusPrefix + '圖像QR未找到.', 'grey');
-            }
-        } catch (err) {
-            const msgL = (err?.message || '').toLowerCase();
-            let eType = 'Scan Err', color='orange';
-            if(msgL.includes("not found") || msgL.includes("unable to find") || msgL.includes("no qr code found")){ eType='Not Found'; color='grey';}
-            addBatchScanError(fileNameForReport, null, 'Image QR', eType, err.message || String(err));
-            updateStatusSpan(statusPrefix + `圖像QR掃描失敗: ${eType}`, color);
-        }
+        const codesFoundThisImage = new Set();
+        let imageFullyScanned = false;
+
+        const image = new Image();
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            image.onload = async () => {
+                const mainCanvas = document.createElement('canvas');
+                mainCanvas.width = image.width;
+                mainCanvas.height = image.height;
+                const mainCtx = mainCanvas.getContext('2d');
+                mainCtx.drawImage(image, 0, 0);
+
+                let fullScanSuccess = false;
+                updateStatusSpan(statusPrefix + `掃描圖像 (整頁 QR)...`, 'grey');
+                try {
+                    const blob = await new Promise(res => mainCanvas.toBlob(res, 'image/png'));
+                    const imageFileForScanner = new File([blob], fileNameForReport, { type: 'image/png' });
+                    const result = await qr.scanFile(imageFileForScanner, false);
+                    const txt = result?.decodedText?.trim() || (typeof result === 'string' ? result.trim() : null);
+
+                    if (txt && /^TW[A-Z0-9]{13}$/.test(txt)) {
+                        if (!codesFoundThisImage.has(txt)) {
+                            await simulateBarcodeInput(txt, fileNameForReport);
+                            totalSimulatedInBatch++;
+                            codesFoundThisImage.add(txt);
+                            updateStatusSpan(statusPrefix + `圖像QR掃描成功 (整頁): ${txt.substring(0, 6)}...`, 'green');
+                        }
+                        fullScanSuccess = true;
+                    } else if (txt) {
+                        addBatchScanError(fileNameForReport, null, '圖像整頁 QR', 'Invalid Format', `'${txt.substring(0, 10)}...'`);
+                        updateStatusSpan(statusPrefix + `圖像QR無效 (整頁): ${txt.substring(0, 10)}...`, 'orange');
+                    } else {
+                        addBatchScanError(fileNameForReport, null, '圖像整頁 QR', 'Not Found', '整頁掃描未找到');
+                        updateStatusSpan(statusPrefix + '圖像QR未找到 (整頁).', 'grey');
+                    }
+                } catch (err) {
+                    const msgL = (err?.message || '').toLowerCase();
+                    let eType = 'Scan Err';
+                    if (msgL.includes("not found") || msgL.includes("unable to find") || msgL.includes("no qr code found") || msgL.includes("multiformat")) {
+                        eType = 'Not Found';
+                    }
+                    addBatchScanError(fileNameForReport, null, '圖像整頁 QR', eType, err.message || String(err));
+                    updateStatusSpan(statusPrefix + `圖像QR掃描失敗 (整頁): ${eType}`, 'orange');
+                }
+
+                    updateStatusSpan(statusPrefix + `準備掃描圖像象限...`, 'grey');
+                    const w = mainCanvas.width;
+                    const h = mainCanvas.height;
+                    const quads = [
+                        { n: '左上', x: 0, y: 0, w: w / 2, h: h / 2 },
+                        { n: '右上', x: w / 2, y: 0, w: w / 2, h: h / 2 },
+                        { n: '左下', x: 0, y: h / 2, w: w / 2, h: h / 2 },
+                        { n: '右下', x: w / 2, y: h / 2, w: w / 2, h: h / 2 }
+                    ];
+                    const quadCanvas = document.createElement('canvas');
+                    const quadCtx = quadCanvas.getContext('2d', { willReadFrequently: true });
+
+                    for (const q of quads) {
+                        currentFeatureStates = await getFeatureStatesFromContent();
+                        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Cancelled', '功能已停用');
+                            break;
+                        }
+                        updateStatusSpan(statusPrefix + `掃描圖像 (${q.n} QR)...`, 'grey');
+                        const sx = Math.floor(q.x), sy = Math.floor(q.y);
+                        const sw = Math.max(1, Math.ceil(q.w)), sh = Math.max(1, Math.ceil(q.h));
+                        if (sw <= 0 || sh <= 0 || sx >= w || sy >= h) {
+                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Scan Err', 'Invalid Geo');
+                            continue;
+                        }
+                        quadCanvas.width = sw; quadCanvas.height = sh;
+                        quadCtx.drawImage(mainCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+                        try {
+                            const blobQ = await new Promise(res => quadCanvas.toBlob(res, 'image/png'));
+                            const quadImageFile = new File([blobQ], `${fileNameForReport}_${q.n}.png`, { type: 'image/png' });
+                            const resultQ = await qr.scanFile(quadImageFile, false);
+                            const txtQ = resultQ?.decodedText?.trim() || (typeof resultQ === 'string' ? resultQ.trim() : null);
+
+                            if (txtQ && /^TW[A-Z0-9]{13}$/.test(txtQ)) {
+                                if (!codesFoundThisImage.has(txtQ)) {
+                                    await simulateBarcodeInput(txtQ, fileNameForReport);
+                                    totalSimulatedInBatch++;
+                                    codesFoundThisImage.add(txtQ);
+                                    updateStatusSpan(statusPrefix + `圖像QR掃描成功 (${q.n}): ${txtQ.substring(0, 6)}...`, 'green');
+                                }
+                            } else if (txtQ) {
+                                addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Invalid Format', `'${txtQ.substring(0, 10)}...'`);
+                                updateStatusSpan(statusPrefix + `圖像QR無效 (${q.n}): ${txtQ.substring(0, 10)}...`, 'orange');
+                            } else {
+                                addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Not Found', `${q.n} 掃描未找到`);
+                            }
+                        } catch (qErr) {
+                            const msgLQ = (qErr?.message || '').toLowerCase();
+                            let eTypeQ = 'Scan Err';
+                            if (msgLQ.includes("not found") || msgLQ.includes("unable to find") || msgLQ.includes("no qr code found") || msgLQ.includes("multiformat")) {
+                                eTypeQ = 'Not Found';
+                            }
+                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, eTypeQ, qErr.message || String(qErr));
+                            updateStatusSpan(statusPrefix + `圖像QR掃描失敗 (${q.n}): ${eTypeQ}`, 'orange');
+                        }
+                    }
+
+                if (codesFoundThisImage.size === 0) {
+                    if (!batchScanErrors.some(err => err.fileName === fileNameForReport && err.scanType?.includes('圖像'))) {
+                        addBatchScanError(fileNameForReport, null, '圖像 QR', 'Not Found', '所有掃描嘗試均未找到QR碼');
+                    }
+                    updateStatusSpan(statusPrefix + '圖像QR掃描完成，未找到條碼.', 'grey');
+                } else {
+                    updateStatusSpan(statusPrefix + `圖像QR掃描完成，找到 ${codesFoundThisImage.size} 個條碼.`, 'green');
+                }
+                imageFullyScanned = true;
+            };
+            image.onerror = () => {
+                addBatchScanError(fileNameForReport, null, 'Image Load', 'Load Error', '無法載入圖像文件');
+                updateStatusSpan(statusPrefix + '無法載入圖像文件', 'red');
+                imageFullyScanned = true;
+            };
+            image.src = e.target.result;
+        };
+        reader.onerror = () => {
+            addBatchScanError(fileNameForReport, null, 'Image Read', 'Read Error', '無法讀取圖像文件');
+            updateStatusSpan(statusPrefix + '無法讀取圖像文件', 'red');
+        };
+        reader.readAsDataURL(file);
+
     }
+
 
     async function removeFileScannerUI() {
         const fin = document.getElementById(`${SCRIPT_PREFIX}_customFileInput`);
