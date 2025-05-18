@@ -1,4 +1,4 @@
-
+// background.js
 const FEATURE_KEYS = [
     'masterEnabled',
     'featureFileScanEnabled',
@@ -7,7 +7,8 @@ const FEATURE_KEYS = [
     'featureNextDayEnabled',
     'featureNextDayAutoStartEnabled',
     'featureCheckoutEnabled',
-    'featureOneItemPerBoxEnabled'
+    'featureOneItemPerBoxEnabled',
+    'featureTTSEnabled' // 新增 TTS 開關鍵
 ];
 
 const ALARM_NAME = 'disableFeaturesAtMidnight';
@@ -35,7 +36,6 @@ function scheduleAlarm() {
     const msUntilMidnight = nextMidnight.getTime() - now.getTime();
 
     chrome.alarms.clear(ALARM_NAME, (wasCleared) => {
-
         chrome.alarms.create(ALARM_NAME, {
             when: Date.now() + msUntilMidnight
         });
@@ -62,4 +62,3 @@ chrome.runtime.onStartup.addListener(() => {
         }
     });
 });
-

@@ -9,6 +9,7 @@ let featureStates = {
     featureCheckoutEnabled: true,
     featureCheckoutAction: true,
     featureOneItemPerBoxEnabled: true,
+    featureTTSEnabled: true,
 };
 
 function loadFeatureStates() {
@@ -82,28 +83,37 @@ function handleFeatureStateChange(isInitialLoad = false) {
 
 let currentUrl = window.location.href;
 let checkoutActionPerformed = false;
-
 const CHECKOUT_TARGET_URL = 'https://sp.spx.shopee.tw/outbound-management/self-collection-outbound/';
+let checkoutDataProcessingIntervalId = null;
+let spokenPhrasesThisSession = new Set();
 
 function checkUrlAndResetStates(newUrl, isInitialLoad = false) {
     const isOnTargetUrl = newUrl.startsWith(CHECKOUT_TARGET_URL);
     const previousUrlWasTarget = currentUrl.startsWith(CHECKOUT_TARGET_URL);
 
-    let needsReset = false;
+    if (!isOnTargetUrl && previousUrlWasTarget) {
+        stopCheckoutDataProcessingAndTTS();
+    } else if (isOnTargetUrl && (!previousUrlWasTarget || newUrl !== currentUrl || isInitialLoad)) {
+        stopCheckoutDataProcessingAndTTS();
+        startCheckoutDataProcessingAndTTS();
+    }
+
+
+    let needsCheckoutActionReset = false;
     if (isInitialLoad) {
         if (!isOnTargetUrl) {
-            needsReset = true;
+            needsCheckoutActionReset = true;
         }
     } else {
         if (previousUrlWasTarget && !isOnTargetUrl) {
-             needsReset = true;
+             needsCheckoutActionReset = true;
         }
         else if (!previousUrlWasTarget && isOnTargetUrl) {
-             needsReset = true;
+             needsCheckoutActionReset = true;
         }
     }
 
-    if (needsReset && checkoutActionPerformed) {
+    if (needsCheckoutActionReset && checkoutActionPerformed) {
         checkoutActionPerformed = false;
     }
 
@@ -199,7 +209,6 @@ function stopAutoCallNumberFeature() {
     }
 }
 
-
 let nextDayIntervalId = null;
 let nextDayCheckInterval = null;
 let oneItemPerBoxCheckInterval = null;
@@ -212,13 +221,12 @@ function startNextDayFeature() {
     if (nextDayIntervalId) return;
 
     nextDayIntervalId = setInterval(function() {
-
         const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-to/detail/';
         const currentUrl = window.location.href;
 
         if (currentUrl.includes(targetUrl)) {
             runCodeIfUrlContains(targetUrl, function() {
-                 if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
+                 if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return; 
                 checkAndClickNextDay();
                 addOrUpdateNextDayCheckbox();
                 addOrUpdateOneItemPerBoxCheckbox();
@@ -513,38 +521,194 @@ function removeOneItemPerBoxCheckbox() {
 
 startNextDayFeature();
 
+function startCheckoutDataProcessingAndTTS() {
+    if (checkoutDataProcessingIntervalId === null) {
+        spokenPhrasesThisSession.clear();
+        setTimeout(processAndSpeakCheckoutData, 1500);
+        checkoutDataProcessingIntervalId = setInterval(processAndSpeakCheckoutData, 4000);
+    }
+}
+
+function stopCheckoutDataProcessingAndTTS() {
+    if (checkoutDataProcessingIntervalId !== null) {
+        clearInterval(checkoutDataProcessingIntervalId);
+        checkoutDataProcessingIntervalId = null;
+    }
+    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+    }
+    spokenPhrasesThisSession.clear();
+}
+
+function processAndSpeakCheckoutData() {
+    const formattedTextElements = document.querySelectorAll('.td-content.td-content-ellipsis');
+    const regex = /^[A-Za-z]-\d{2}$/;
+    const newFormattedTexts = [];
+    formattedTextElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && regex.test(text)) {
+            if (!spokenPhrasesThisSession.has(text)) {
+                newFormattedTexts.push(text);
+                spokenPhrasesThisSession.add(text);
+            }
+        }
+    });
+
+    const spanElements = document.querySelectorAll('span[data-v-445825e8]');
+    const newLastThreeDigits = [];
+    spanElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length >= 3) {
+            const lastThree = text.slice(-3);
+            if (!spokenPhrasesThisSession.has(lastThree)) {
+                newLastThreeDigits.push(lastThree);
+                spokenPhrasesThisSession.add(lastThree);
+            }
+        }
+    });
+
+    const totalCollectionElements = document.querySelectorAll('.total-collection-content');
+    const newTotalCollectionValues = [];
+    totalCollectionElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && !isNaN(parseFloat(text))) {
+            const phrase = `總金額 ${text} 元`;
+            if (!spokenPhrasesThisSession.has(phrase)) {
+                newTotalCollectionValues.push(phrase);
+                spokenPhrasesThisSession.add(phrase);
+            }
+        }
+    });
+
+    const changeAmountElements = document.querySelectorAll('span[data-v-09bdac12]');
+    const newChangeAmountsToSpeak = [];
+    changeAmountElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text !== '-') {
+            const phrase = `找 ${text} 元`;
+            if (!spokenPhrasesThisSession.has(phrase)) {
+                newChangeAmountsToSpeak.push(phrase);
+                spokenPhrasesThisSession.add(phrase);
+            }
+        }
+    });
+
+    const itemsToSpeakInOrder = [];
+    const newlyFoundItemsForConsoleLog = {};
+
+    if (newFormattedTexts.length > 0) {
+        newlyFoundItemsForConsoleLog["X-01 格式"] = [...newFormattedTexts];
+        itemsToSpeakInOrder.push(...newFormattedTexts);
+    }
+    if (newLastThreeDigits.length > 0) {
+        newlyFoundItemsForConsoleLog["後三碼"] = [...newLastThreeDigits];
+        itemsToSpeakInOrder.push(...newLastThreeDigits);
+    }
+    if (newTotalCollectionValues.length > 0) {
+        newlyFoundItemsForConsoleLog["總收款金額"] = [...newTotalCollectionValues];
+        itemsToSpeakInOrder.push(...newTotalCollectionValues);
+    }
+    if (newChangeAmountsToSpeak.length > 0) {
+        newlyFoundItemsForConsoleLog["應找金額"] = [...newChangeAmountsToSpeak];
+        itemsToSpeakInOrder.push(...newChangeAmountsToSpeak);
+    }
+    
+    if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
+        console.log("蝦皮自動化: 新發現待播報資料:", newlyFoundItemsForConsoleLog);
+    }
+
+    if (itemsToSpeakInOrder.length > 0) {
+        speakTextArray(itemsToSpeakInOrder);
+    }
+}
+
+
+function speakTextArray(items) {
+    if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled) {
+        return;
+    }
+    if (!items || items.length === 0) {
+        return;
+    }
+    if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') {
+        console.warn("蝦皮自動化: 瀏覽器不支援 SpeechSynthesis API。");
+        return;
+    }
+    speechSynthesis.cancel();
+
+    let currentIndex = 0;
+    function speakNext() {
+        if (currentIndex < items.length) {
+            let textToSpeak = items[currentIndex];
+            
+            if (textToSpeak.startsWith("總金額 ")) {
+            } else if (textToSpeak.startsWith("找 ") && textToSpeak.endsWith(" 元")) {
+            } else if (/^[A-Za-z]-\d{2}$/.test(textToSpeak)) { 
+                textToSpeak = textToSpeak.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
+                    return `${p1} ${p2.split('').join(' ')}`;
+                });
+            } else if (/^\d{3}$/.test(textToSpeak)) { 
+                 textToSpeak = textToSpeak.split('').join(' ');
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.lang = 'zh-TW';
+            utterance.rate = 0.9;
+            utterance.onend = () => {
+                currentIndex++;
+                setTimeout(speakNext, 300);
+            };
+            utterance.onerror = (event) => {
+                console.error("蝦皮自動化: SpeechSynthesisUtterance 錯誤", event.error);
+                currentIndex++;
+                setTimeout(speakNext, 300);
+            };
+            speechSynthesis.speak(utterance);
+        }
+    }
+    speakNext();
+}
+
 
 function autoCheckout() {
-    if (!featureStates.masterEnabled || !featureStates.featureCheckoutEnabled) {
-        return;
-    }
-
     const isOnCheckoutUrl = window.location.href.startsWith(CHECKOUT_TARGET_URL);
-    if (!isOnCheckoutUrl) {
-        return;
-    }
 
-    if (checkoutActionPerformed) {
-        return;
-    }
-
-    const operationButton = document.querySelector('.task-operation');
-    const rowCount = document.querySelectorAll('.ssc-table-row-normal').length;
-    const buttonCount = document.querySelectorAll('.ssc-btn-type-text').length;
-    const tableCount = document.querySelectorAll('.ssc-table-header-column-container').length;
-
-    const conditionsMet = rowCount > 0 && rowCount === buttonCount && operationButton && buttonCount * 2 === tableCount;
-
-    if (conditionsMet) {
-        try {
-            if (featureStates.featureCheckoutAction === true) {
-                operationButton.click();
-            } else {
-                operationButton.focus();
-            }
-            checkoutActionPerformed = true;
-        } catch (error) {
+    if (isOnCheckoutUrl) {
+        if (featureStates.masterEnabled && featureStates.featureCheckoutEnabled) { 
+            startCheckoutDataProcessingAndTTS();
+        } else {
+            stopCheckoutDataProcessingAndTTS(); 
         }
+
+        if (!featureStates.masterEnabled || !featureStates.featureCheckoutEnabled) {
+            checkoutActionPerformed = false; 
+            return;
+        }
+        
+        if (checkoutActionPerformed) {
+            return;
+        }
+
+        const operationButton = document.querySelector('.task-operation');
+        const rowCount = document.querySelectorAll('.ssc-table-row-normal').length;
+        const buttonCount = document.querySelectorAll('.ssc-btn-type-text').length;
+        const tableCount = document.querySelectorAll('.ssc-table-header-column-container').length;
+        const conditionsMet = rowCount > 0 && rowCount === buttonCount && operationButton && buttonCount * 2 === tableCount;
+
+        if (conditionsMet) {
+            try {
+                if (featureStates.featureCheckoutAction === true) {
+                    operationButton.click();
+                } else {
+                    operationButton.focus();
+                }
+                checkoutActionPerformed = true;
+            } catch (error) {
+            }
+        }
+    } else { 
+        stopCheckoutDataProcessingAndTTS();
+        checkoutActionPerformed = false;
     }
 };
 
@@ -570,33 +734,23 @@ function autoCheckout() {
     const ALL_FEATURE_STORAGE_KEYS_FOR_LISTENER = [
          'masterEnabled', 'featureQueueingEnabled', 'featureCheckoutEnabled',
          'featureBoxScanEnabled', 'featureNextDayEnabled', 'featureNextDayAutoStartEnabled',
-         'featureFileScanEnabled', 'featureOneItemPerBoxEnabled'
+         'featureFileScanEnabled', 'featureOneItemPerBoxEnabled', 'featureTTSEnabled'
     ];
 
-    async function getFeatureStatesFromContent() {
+    async function getFeatureStatesFromContent() { 
         return new Promise((resolve) => {
-            const defaultFeatureStates = {
-                masterEnabled: true,
-                featureFileScanEnabled: true,
-                featureBoxScanEnabled: true,
-                featureQueueingEnabled: true,
-                featureQueueingAction: true,
-                featureNextDayEnabled: true,
-                featureNextDayAutoStartEnabled: true,
-                featureCheckoutEnabled: true,
-                featureCheckoutAction: true,
-                featureOneItemPerBoxEnabled: true,
-            };
-            chrome.storage.sync.get(defaultFeatureStates, (data) => {
+            const currentStates = { ...featureStates }; 
+            chrome.storage.sync.get(Object.keys(currentStates), (data) => {
                 const lastError = chrome.runtime.lastError;
                 if (lastError) {
-                     resolve(defaultFeatureStates);
+                     resolve(currentStates); 
                 } else {
-                    resolve(data);
+                    resolve({ ...currentStates, ...data });
                 }
             });
         });
     }
+
 
     if (typeof pdfjsLib !== 'undefined') {
         if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -639,8 +793,8 @@ function autoCheckout() {
             checkCounter++;
             const pdfOk=typeof pdfjsLib!=='undefined'&&pdfjsLib.GlobalWorkerOptions.workerSrc;
             const qrOk=typeof Html5Qrcode!=='undefined';
-            const currentFeatureStates = await getFeatureStatesFromContent();
-            const enabled = currentFeatureStates.masterEnabled && currentFeatureStates.featureFileScanEnabled;
+            const currentRuntimeFeatureStates = await getFeatureStatesFromContent(); 
+            const enabled = currentRuntimeFeatureStates.masterEnabled && currentRuntimeFeatureStates.featureFileScanEnabled;
 
             if (!enabled) {
                 clearInterval(librariesCheckInterval); librariesCheckInterval=null;
@@ -711,8 +865,8 @@ function autoCheckout() {
     }
 
     async function initializeElements() {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             await removeFileScannerUI();
             return;
         }
@@ -786,8 +940,8 @@ function autoCheckout() {
     }
 
     async function handleFileSelection(event) {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if(!currentFeatureStates.masterEnabled||!currentFeatureStates.featureFileScanEnabled){ event.target.value=''; return; }
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if(!currentRuntimeFeatureStates.masterEnabled||!currentRuntimeFeatureStates.featureFileScanEnabled){ event.target.value=''; return; }
 
         const fin=event.target; if(isProcessing){ updateStatusSpan("處理中..", "orange"); fin.value=''; return; }
 
@@ -806,8 +960,8 @@ function autoCheckout() {
     }
 
     async function processNextFileInQueue() {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             fileQueue = []; isProcessing = false;
             updateStatusSpan("佇列已取消(功能停用)", "orange");
             resetFileInputState(); totalFilesInBatch = 0;
@@ -936,8 +1090,8 @@ function autoCheckout() {
     }
 
     async function simulateBarcodeInput(code, fileNameForReport) {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             addBatchScanError(fileNameForReport, null, 'Simulate', 'Cancelled by Toggle', '功能已停用');
             throw new Error("Op cancelled by toggle");
         }
@@ -964,8 +1118,8 @@ function autoCheckout() {
     }
 
     async function processBarcodesAndQRCodes(pdf, processedCodesThisFile, statusPrefix, fileNameForReport) {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             addBatchScanError(fileNameForReport, null, 'Scan', 'Cancelled', '功能已停用');
             return;
         }
@@ -1147,7 +1301,7 @@ function autoCheckout() {
                     await simulateBarcodeInput(code, fileNameForReport);
                     totalSimulatedInBatch++;
                     updateStatusSpan(statusPrefix + `已模擬QR條碼 ${code.substring(0,6)}... (${i+1}/${codesFoundByQRThisFunc.length})`, 'grey');
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 300));
                 } catch (simError) {
                     updateStatusSpan(statusPrefix + `模擬QR條碼 ${code.substring(0,6)}... 失敗`, 'red');
                 }
@@ -1169,8 +1323,8 @@ function autoCheckout() {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
-                    let currentFeatureStates = await getFeatureStatesFromContent();
-                    if(!currentFeatureStates.masterEnabled||!currentFeatureStates.featureFileScanEnabled){
+                    let currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                    if(!currentRuntimeFeatureStates.masterEnabled||!currentRuntimeFeatureStates.featureFileScanEnabled){
                         addBatchScanError(fileNameForReport,null,'PDF','Cancelled','功能已停用'); resolve(); return;
                     }
                     updateStatusSpan(statusPrefix + '讀取PDF..', 'grey');
@@ -1180,8 +1334,8 @@ function autoCheckout() {
                     updateStatusSpan(statusPrefix + '掃描PDF文字..', 'grey');
                     const foundTextCodes = new Set();
                     for (let i = 1; i <= pdfDoc.numPages; i++) {
-                        currentFeatureStates = await getFeatureStatesFromContent();
-                        if(!currentFeatureStates.masterEnabled||!currentFeatureStates.featureFileScanEnabled){
+                        currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                        if(!currentRuntimeFeatureStates.masterEnabled||!currentRuntimeFeatureStates.featureFileScanEnabled){
                              addBatchScanError(fileNameForReport,i,'Text Scan','Cancelled','功能已停用'); break;
                         }
                         const page = await pdfDoc.getPage(i);
@@ -1203,8 +1357,8 @@ function autoCheckout() {
                         updateStatusSpan(statusPrefix + `PDF文字中找到 ${foundTextCodes.size} 個條碼，模擬輸入中...`, 'blue');
                         let simulatedCount = 0;
                         for (const code of foundTextCodes) {
-                             currentFeatureStates = await getFeatureStatesFromContent();
-                             if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+                             currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                             if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                                 addBatchScanError(fileNameForReport, null, 'Simulate Text', 'Cancelled', '功能已停用');
                                 updateStatusSpan(statusPrefix + "文字條碼模擬輸入已取消", "orange");
                                 break;
@@ -1214,13 +1368,13 @@ function autoCheckout() {
                                 totalSimulatedInBatch++;
                                 simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 500));
+                                await new Promise(r => setTimeout(r, 300));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `模擬文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
                             }
                         }
-                        currentFeatureStates = await getFeatureStatesFromContent();
-                        if (currentFeatureStates.masterEnabled && currentFeatureStates.featureFileScanEnabled) {
+                        currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                        if (currentRuntimeFeatureStates.masterEnabled && currentRuntimeFeatureStates.featureFileScanEnabled) {
                             updateStatusSpan(statusPrefix + `PDF文字條碼處理完成 (${foundTextCodes.size}個).`, 'green', true);
                         }
                     }
@@ -1256,8 +1410,8 @@ function autoCheckout() {
             const r = new FileReader();
             r.onload = async (e) => {
                 try{
-                    let currentFeatureStates = await getFeatureStatesFromContent();
-                    if(!currentFeatureStates.masterEnabled||!currentFeatureStates.featureFileScanEnabled){
+                    let currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                    if(!currentRuntimeFeatureStates.masterEnabled||!currentRuntimeFeatureStates.featureFileScanEnabled){
                         addBatchScanError(fileNameForReport,null,'HTML','Cancelled','功能已停用'); resolve(); return;
                     }
                     const html=e.target.result;
@@ -1279,8 +1433,8 @@ function autoCheckout() {
                         updateStatusSpan(statusPrefix + `HTML中找到 ${foundCodes.size} 個條碼，模擬輸入中...`, 'blue');
                         let simulatedCount = 0;
                         for (const code of foundCodes) {
-                             currentFeatureStates = await getFeatureStatesFromContent();
-                             if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+                             currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                             if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                                 addBatchScanError(fileNameForReport, null, 'HTML Sim', 'Cancelled', '功能已停用');
                                 updateStatusSpan(statusPrefix + "HTML模擬輸入已取消", "orange");
                                 break;
@@ -1289,13 +1443,13 @@ function autoCheckout() {
                                 await simulateBarcodeInput(code, fileNameForReport);
                                 totalSimulatedInBatch++; simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬HTML條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 500));
+                                await new Promise(r => setTimeout(r, 300));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `HTML模擬 ${code.substring(0,6)}... 失敗`, 'red');
                             }
                         }
-                        currentFeatureStates = await getFeatureStatesFromContent();
-                        if (currentFeatureStates.masterEnabled && currentFeatureStates.featureFileScanEnabled) {
+                        currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                        if (currentRuntimeFeatureStates.masterEnabled && currentRuntimeFeatureStates.featureFileScanEnabled) {
                             updateStatusSpan(statusPrefix + `HTML條碼處理完成 (${foundCodes.size}個).`, 'green', true);
                         }
                     } else {
@@ -1319,8 +1473,8 @@ function autoCheckout() {
     }
 
     async function processImageFile(file, statusPrefix, fileNameForReport) {
-        let currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        let currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             addBatchScanError(fileNameForReport, null, 'Image', 'Cancelled', '功能已停用');
             return;
         }
@@ -1389,63 +1543,64 @@ function autoCheckout() {
                     updateStatusSpan(statusPrefix + `圖像QR掃描失敗 (整頁): ${eType}`, 'orange');
                 }
 
-                    updateStatusSpan(statusPrefix + `準備掃描圖像象限...`, 'grey');
-                    const w = mainCanvas.width;
-                    const h = mainCanvas.height;
-                    const quads = [
-                        { n: '左上', x: 0, y: 0, w: w / 2, h: h / 2 },
-                        { n: '右上', x: w / 2, y: 0, w: w / 2, h: h / 2 },
-                        { n: '左下', x: 0, y: h / 2, w: w / 2, h: h / 2 },
-                        { n: '右下', x: w / 2, y: h / 2, w: w / 2, h: h / 2 }
-                    ];
-                    const quadCanvas = document.createElement('canvas');
-                    const quadCtx = quadCanvas.getContext('2d', { willReadFrequently: true });
 
-                    for (const q of quads) {
-                        currentFeatureStates = await getFeatureStatesFromContent();
-                        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
-                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Cancelled', '功能已停用');
-                            break;
-                        }
-                        updateStatusSpan(statusPrefix + `掃描圖像 (${q.n} QR)...`, 'grey');
-                        const sx = Math.floor(q.x), sy = Math.floor(q.y);
-                        const sw = Math.max(1, Math.ceil(q.w)), sh = Math.max(1, Math.ceil(q.h));
-                        if (sw <= 0 || sh <= 0 || sx >= w || sy >= h) {
-                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Scan Err', 'Invalid Geo');
-                            continue;
-                        }
-                        quadCanvas.width = sw; quadCanvas.height = sh;
-                        quadCtx.drawImage(mainCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+                updateStatusSpan(statusPrefix + `準備掃描圖像象限...`, 'grey');
+                const w = mainCanvas.width;
+                const h = mainCanvas.height;
+                const quads = [
+                    { n: '左上', x: 0, y: 0, w: w / 2, h: h / 2 },
+                    { n: '右上', x: w / 2, y: 0, w: w / 2, h: h / 2 },
+                    { n: '左下', x: 0, y: h / 2, w: w / 2, h: h / 2 },
+                    { n: '右下', x: w / 2, y: h / 2, w: w / 2, h: h / 2 }
+                ];
+                const quadCanvas = document.createElement('canvas');
+                const quadCtx = quadCanvas.getContext('2d', { willReadFrequently: true });
 
-                        try {
-                            const blobQ = await new Promise(res => quadCanvas.toBlob(res, 'image/png'));
-                            const quadImageFile = new File([blobQ], `${fileNameForReport}_${q.n}.png`, { type: 'image/png' });
-                            const resultQ = await qr.scanFile(quadImageFile, false);
-                            const txtQ = resultQ?.decodedText?.trim() || (typeof resultQ === 'string' ? resultQ.trim() : null);
-
-                            if (txtQ && /^TW[A-Z0-9]{13}$/.test(txtQ)) {
-                                if (!codesFoundThisImage.has(txtQ)) {
-                                    await simulateBarcodeInput(txtQ, fileNameForReport);
-                                    totalSimulatedInBatch++;
-                                    codesFoundThisImage.add(txtQ);
-                                    updateStatusSpan(statusPrefix + `圖像QR掃描成功 (${q.n}): ${txtQ.substring(0, 6)}...`, 'green');
-                                }
-                            } else if (txtQ) {
-                                addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Invalid Format', `'${txtQ.substring(0, 10)}...'`);
-                                updateStatusSpan(statusPrefix + `圖像QR無效 (${q.n}): ${txtQ.substring(0, 10)}...`, 'orange');
-                            } else {
-                                addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Not Found', `${q.n} 掃描未找到`);
-                            }
-                        } catch (qErr) {
-                            const msgLQ = (qErr?.message || '').toLowerCase();
-                            let eTypeQ = 'Scan Err';
-                            if (msgLQ.includes("not found") || msgLQ.includes("unable to find") || msgLQ.includes("no qr code found") || msgLQ.includes("multiformat")) {
-                                eTypeQ = 'Not Found';
-                            }
-                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, eTypeQ, qErr.message || String(qErr));
-                            updateStatusSpan(statusPrefix + `圖像QR掃描失敗 (${q.n}): ${eTypeQ}`, 'orange');
-                        }
+                for (const q of quads) {
+                    currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                    if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
+                        addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Cancelled', '功能已停用');
+                        break;
                     }
+                    updateStatusSpan(statusPrefix + `掃描圖像 (${q.n} QR)...`, 'grey');
+                    const sx = Math.floor(q.x), sy = Math.floor(q.y);
+                    const sw = Math.max(1, Math.ceil(q.w)), sh = Math.max(1, Math.ceil(q.h));
+                    if (sw <= 0 || sh <= 0 || sx >= w || sy >= h) {
+                        addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Scan Err', 'Invalid Geo');
+                        continue;
+                    }
+                    quadCanvas.width = sw; quadCanvas.height = sh;
+                    quadCtx.drawImage(mainCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+                    try {
+                        const blobQ = await new Promise(res => quadCanvas.toBlob(res, 'image/png'));
+                        const quadImageFile = new File([blobQ], `${fileNameForReport}_${q.n}.png`, { type: 'image/png' });
+                        const resultQ = await qr.scanFile(quadImageFile, false);
+                        const txtQ = resultQ?.decodedText?.trim() || (typeof resultQ === 'string' ? resultQ.trim() : null);
+
+                        if (txtQ && /^TW[A-Z0-9]{13}$/.test(txtQ)) {
+                            if (!codesFoundThisImage.has(txtQ)) {
+                                await simulateBarcodeInput(txtQ, fileNameForReport);
+                                totalSimulatedInBatch++;
+                                codesFoundThisImage.add(txtQ);
+                                updateStatusSpan(statusPrefix + `圖像QR掃描成功 (${q.n}): ${txtQ.substring(0, 6)}...`, 'green');
+                            }
+                        } else if (txtQ) {
+                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Invalid Format', `'${txtQ.substring(0, 10)}...'`);
+                            updateStatusSpan(statusPrefix + `圖像QR無效 (${q.n}): ${txtQ.substring(0, 10)}...`, 'orange');
+                        } else {
+                            addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, 'Not Found', `${q.n} 掃描未找到`);
+                        }
+                    } catch (qErr) {
+                        const msgLQ = (qErr?.message || '').toLowerCase();
+                        let eTypeQ = 'Scan Err';
+                        if (msgLQ.includes("not found") || msgLQ.includes("unable to find") || msgLQ.includes("no qr code found") || msgLQ.includes("multiformat")) {
+                            eTypeQ = 'Not Found';
+                        }
+                        addBatchScanError(fileNameForReport, null, `圖像 ${q.n} QR`, eTypeQ, qErr.message || String(qErr));
+                        updateStatusSpan(statusPrefix + `圖像QR掃描失敗 (${q.n}): ${eTypeQ}`, 'orange');
+                    }
+                }
 
                 if (codesFoundThisImage.size === 0) {
                     if (!batchScanErrors.some(err => err.fileName === fileNameForReport && err.scanType?.includes('圖像'))) {
@@ -1469,7 +1624,6 @@ function autoCheckout() {
             updateStatusSpan(statusPrefix + '無法讀取圖像文件', 'red');
         };
         reader.readAsDataURL(file);
-
     }
 
 
@@ -1485,8 +1639,8 @@ function autoCheckout() {
     window.removeShopeeFileScannerUI = removeFileScannerUI;
 
     async function checkUrlAndMaybeInitialize() {
-        const currentFeatureStates = await getFeatureStatesFromContent();
-        if (!currentFeatureStates.masterEnabled || !currentFeatureStates.featureFileScanEnabled) {
+        const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+        if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
             if (uiInitialized) await removeFileScannerUI();
             return;
         }
