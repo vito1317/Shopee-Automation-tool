@@ -1147,7 +1147,7 @@ function autoCheckout() {
                     await simulateBarcodeInput(code, fileNameForReport);
                     totalSimulatedInBatch++;
                     updateStatusSpan(statusPrefix + `已模擬QR條碼 ${code.substring(0,6)}... (${i+1}/${codesFoundByQRThisFunc.length})`, 'grey');
-                    await new Promise(r => setTimeout(r, 300));
+                    await new Promise(r => setTimeout(r, 500));
                 } catch (simError) {
                     updateStatusSpan(statusPrefix + `模擬QR條碼 ${code.substring(0,6)}... 失敗`, 'red');
                 }
@@ -1214,7 +1214,7 @@ function autoCheckout() {
                                 totalSimulatedInBatch++;
                                 simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 300));
+                                await new Promise(r => setTimeout(r, 500));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `模擬文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
                             }
@@ -1289,7 +1289,7 @@ function autoCheckout() {
                                 await simulateBarcodeInput(code, fileNameForReport);
                                 totalSimulatedInBatch++; simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬HTML條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 300));
+                                await new Promise(r => setTimeout(r, 500));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `HTML模擬 ${code.substring(0,6)}... 失敗`, 'red');
                             }
