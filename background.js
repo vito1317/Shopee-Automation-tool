@@ -1,4 +1,3 @@
-// background.js
 const FEATURE_KEYS = [
     'masterEnabled',
     'featureFileScanEnabled',
@@ -8,7 +7,7 @@ const FEATURE_KEYS = [
     'featureNextDayAutoStartEnabled',
     'featureCheckoutEnabled',
     'featureOneItemPerBoxEnabled',
-    'featureTTSEnabled' // 新增 TTS 開關鍵
+    'featureTTSEnabled'
 ];
 
 const ALARM_NAME = 'disableFeaturesAtMidnight';

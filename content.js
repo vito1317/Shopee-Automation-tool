@@ -572,7 +572,7 @@ function processAndSpeakCheckoutData() {
     totalCollectionElements.forEach(el => {
         const text = el.textContent?.trim();
         if (text && !isNaN(parseFloat(text))) {
-            const phrase = `總金額 ${text} 元`;
+            const phrase = `總金額 ${text}`;
             if (!spokenPhrasesThisSession.has(phrase)) {
                 newTotalCollectionValues.push(phrase);
                 spokenPhrasesThisSession.add(phrase);
