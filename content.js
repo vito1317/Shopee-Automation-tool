@@ -43,7 +43,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 function handleFeatureStateChange(isInitialLoad = false) {
     if (featureStates.hasOwnProperty('featureFileScanEnabled')) {
-         if (!featureStates.featureFileScanEnabled) {
+         if (!featureStates.masterEnabled || !featureStates.featureFileScanEnabled) {
              if (typeof window.removeShopeeFileScannerUI === 'function') { window.removeShopeeFileScannerUI(); }
          } else {
              if (typeof window.triggerShopeeFileScannerCheck === 'function') { window.triggerShopeeFileScannerCheck(); }
@@ -51,24 +51,30 @@ function handleFeatureStateChange(isInitialLoad = false) {
     }
 
     if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
-        if (!featureStates.featureNextDayEnabled) {
+        if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) {
             stopNextDayFeature();
         } else {
             startNextDayFeature();
         }
     }
-
     if (featureStates.hasOwnProperty('featureNextDayAutoStartEnabled')) {
         const nextDayCheckbox = document.getElementById('status');
         if (nextDayCheckbox && nextDayCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) {
             nextDayCheckbox.checked = featureStates.featureNextDayAutoStartEnabled;
         }
     }
-
     if (featureStates.hasOwnProperty('featureOneItemPerBoxEnabled')) {
         const oneItemPerBoxCheckbox = document.getElementById('oneItemPerBoxFocusCheckbox');
         if (oneItemPerBoxCheckbox && oneItemPerBoxCheckbox.checked !== featureStates.featureOneItemPerBoxEnabled) {
             oneItemPerBoxCheckbox.checked = featureStates.featureOneItemPerBoxEnabled;
+        }
+    }
+
+    if (featureStates.hasOwnProperty('featureQueueingEnabled')) {
+        if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
+            stopAutoCallNumberFeature();
+        } else {
+            startAutoCallNumberFeature();
         }
     }
 }
@@ -155,10 +161,14 @@ urlChangedFunction_BoxScan();
 setInterval(()=>{urlChangedFunction_BoxScan()},1000);
 
 
-function autoCallNumber() {
+let autoCallNumberIntervalId = null;
+
+function performAutoCallNumberLogic() {
     if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
+        stopAutoCallNumberFeature();
         return;
     }
+
     const currentUrl = window.location.href;
     if (currentUrl === 'https://sp.spx.shopee.tw/queueing-management/queueing-task') {
         const button = document.querySelector('.ssc-btn-type-text');
@@ -171,7 +181,23 @@ function autoCallNumber() {
         }
     }
 }
-setInterval(autoCallNumber, 1500);
+
+function startAutoCallNumberFeature() {
+    if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
+        stopAutoCallNumberFeature();
+        return;
+    }
+    if (autoCallNumberIntervalId === null) {
+        autoCallNumberIntervalId = setInterval(performAutoCallNumberLogic, 1500);
+    }
+}
+
+function stopAutoCallNumberFeature() {
+    if (autoCallNumberIntervalId !== null) {
+        clearInterval(autoCallNumberIntervalId);
+        autoCallNumberIntervalId = null;
+    }
+}
 
 
 let nextDayIntervalId = null;
@@ -179,13 +205,13 @@ let nextDayCheckInterval = null;
 let oneItemPerBoxCheckInterval = null;
 
 function startNextDayFeature() {
+    if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) {
+        stopNextDayFeature();
+        return;
+    }
     if (nextDayIntervalId) return;
 
     nextDayIntervalId = setInterval(function() {
-        if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) {
-            stopNextDayFeature();
-            return;
-        }
 
         const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-to/detail/';
         const currentUrl = window.location.href;
@@ -1121,7 +1147,7 @@ function autoCheckout() {
                     await simulateBarcodeInput(code, fileNameForReport);
                     totalSimulatedInBatch++;
                     updateStatusSpan(statusPrefix + `已模擬QR條碼 ${code.substring(0,6)}... (${i+1}/${codesFoundByQRThisFunc.length})`, 'grey');
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 300));
                 } catch (simError) {
                     updateStatusSpan(statusPrefix + `模擬QR條碼 ${code.substring(0,6)}... 失敗`, 'red');
                 }
@@ -1188,7 +1214,7 @@ function autoCheckout() {
                                 totalSimulatedInBatch++;
                                 simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 500));
+                                await new Promise(r => setTimeout(r, 300));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `模擬文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
                             }
@@ -1263,7 +1289,7 @@ function autoCheckout() {
                                 await simulateBarcodeInput(code, fileNameForReport);
                                 totalSimulatedInBatch++; simulatedCount++;
                                 updateStatusSpan(statusPrefix + `已模擬HTML條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundCodes.size})`, 'grey');
-                                await new Promise(r => setTimeout(r, 500));
+                                await new Promise(r => setTimeout(r, 300));
                             } catch (simError) {
                                 updateStatusSpan(statusPrefix + `HTML模擬 ${code.substring(0,6)}... 失敗`, 'red');
                             }
