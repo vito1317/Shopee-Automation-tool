@@ -226,7 +226,7 @@ function startNextDayFeature() {
 
         if (currentUrl.includes(targetUrl)) {
             runCodeIfUrlContains(targetUrl, function() {
-                 if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return; 
+                 if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
                 checkAndClickNextDay();
                 addOrUpdateNextDayCheckbox();
                 addOrUpdateOneItemPerBoxCheckbox();
@@ -560,9 +560,10 @@ function processAndSpeakCheckoutData() {
         const text = el.textContent?.trim();
         if (text && text.length >= 3) {
             const lastThree = text.slice(-3);
-            if (!spokenPhrasesThisSession.has(lastThree)) {
-                newLastThreeDigits.push(lastThree);
-                spokenPhrasesThisSession.add(lastThree);
+            const phrase = "末三碼 " + lastThree;
+            if (!spokenPhrasesThisSession.has(phrase)) {
+                newLastThreeDigits.push(phrase);
+                spokenPhrasesThisSession.add(phrase);
             }
         }
     });
@@ -612,7 +613,7 @@ function processAndSpeakCheckoutData() {
         newlyFoundItemsForConsoleLog["應找金額"] = [...newChangeAmountsToSpeak];
         itemsToSpeakInOrder.push(...newChangeAmountsToSpeak);
     }
-    
+
     if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
         console.log("蝦皮自動化: 新發現待播報資料:", newlyFoundItemsForConsoleLog);
     }
@@ -640,14 +641,19 @@ function speakTextArray(items) {
     function speakNext() {
         if (currentIndex < items.length) {
             let textToSpeak = items[currentIndex];
-            
+
             if (textToSpeak.startsWith("總金額 ")) {
             } else if (textToSpeak.startsWith("找 ") && textToSpeak.endsWith(" 元")) {
-            } else if (/^[A-Za-z]-\d{2}$/.test(textToSpeak)) { 
+            } else if (textToSpeak.startsWith("末三碼 ")) {
+                const numericPart = textToSpeak.substring(4);
+                if (/^\d{3}$/.test(numericPart)) {
+                    textToSpeak = "末三碼 " + numericPart.split('').join(' ');
+                }
+            } else if (/^[A-Za-z]-\d{2}$/.test(textToSpeak)) {
                 textToSpeak = textToSpeak.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
                     return `${p1} ${p2.split('').join(' ')}`;
                 });
-            } else if (/^\d{3}$/.test(textToSpeak)) { 
+            } else if (/^\d{3}$/.test(textToSpeak)) {
                  textToSpeak = textToSpeak.split('').join(' ');
             }
 
@@ -674,17 +680,17 @@ function autoCheckout() {
     const isOnCheckoutUrl = window.location.href.startsWith(CHECKOUT_TARGET_URL);
 
     if (isOnCheckoutUrl) {
-        if (featureStates.masterEnabled && featureStates.featureCheckoutEnabled) { 
+        if (featureStates.masterEnabled && featureStates.featureCheckoutEnabled) {
             startCheckoutDataProcessingAndTTS();
         } else {
-            stopCheckoutDataProcessingAndTTS(); 
+            stopCheckoutDataProcessingAndTTS();
         }
 
         if (!featureStates.masterEnabled || !featureStates.featureCheckoutEnabled) {
-            checkoutActionPerformed = false; 
+            checkoutActionPerformed = false;
             return;
         }
-        
+
         if (checkoutActionPerformed) {
             return;
         }
@@ -706,7 +712,7 @@ function autoCheckout() {
             } catch (error) {
             }
         }
-    } else { 
+    } else {
         stopCheckoutDataProcessingAndTTS();
         checkoutActionPerformed = false;
     }
@@ -737,13 +743,13 @@ function autoCheckout() {
          'featureFileScanEnabled', 'featureOneItemPerBoxEnabled', 'featureTTSEnabled'
     ];
 
-    async function getFeatureStatesFromContent() { 
+    async function getFeatureStatesFromContent() {
         return new Promise((resolve) => {
-            const currentStates = { ...featureStates }; 
+            const currentStates = { ...featureStates };
             chrome.storage.sync.get(Object.keys(currentStates), (data) => {
                 const lastError = chrome.runtime.lastError;
                 if (lastError) {
-                     resolve(currentStates); 
+                     resolve(currentStates);
                 } else {
                     resolve({ ...currentStates, ...data });
                 }
@@ -793,7 +799,7 @@ function autoCheckout() {
             checkCounter++;
             const pdfOk=typeof pdfjsLib!=='undefined'&&pdfjsLib.GlobalWorkerOptions.workerSrc;
             const qrOk=typeof Html5Qrcode!=='undefined';
-            const currentRuntimeFeatureStates = await getFeatureStatesFromContent(); 
+            const currentRuntimeFeatureStates = await getFeatureStatesFromContent();
             const enabled = currentRuntimeFeatureStates.masterEnabled && currentRuntimeFeatureStates.featureFileScanEnabled;
 
             if (!enabled) {
