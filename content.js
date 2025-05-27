@@ -599,8 +599,20 @@ function processAndSpeakCheckoutData() {
 
     if (newFormattedTexts.length > 0) {
         newlyFoundItemsForConsoleLog["X-01 格式"] = [...newFormattedTexts];
-        itemsToSpeakInOrder.push(...newFormattedTexts);
+        const formattedCabinetCodes = newFormattedTexts.map(text => {
+            return text.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
+                return `${p1}${parseInt(p2, 10)}`;
+            });
+        });
+
+        if (formattedCabinetCodes.length > 0) {
+            itemsToSpeakInOrder.push("櫃位 " + formattedCabinetCodes[0]);
+            for (let i = 1; i < formattedCabinetCodes.length; i++) {
+                itemsToSpeakInOrder.push(formattedCabinetCodes[i]);
+            }
+        }
     }
+
     if (newLastThreeDigits.length > 0) {
         newlyFoundItemsForConsoleLog["後三碼"] = [...newLastThreeDigits];
         itemsToSpeakInOrder.push(...newLastThreeDigits);
@@ -649,11 +661,7 @@ function speakTextArray(items) {
                 if (/^\d{3}$/.test(numericPart)) {
                     textToSpeak = "末三碼 " + numericPart.split('').join(' ');
                 }
-            } else if (/^[A-Za-z]-\d{2}$/.test(textToSpeak)) {
-                textToSpeak = textToSpeak.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
-                    return `${p1} ${p2.split('').join(' ')}`;
-                });
-            } else if (/^\d{3}$/.test(textToSpeak)) {
+            } else if (/^\d{3}$/.test(textToSpeak) && !textToSpeak.startsWith("末三碼 ") && !textToSpeak.startsWith("櫃位 ")) {
                  textToSpeak = textToSpeak.split('').join(' ');
             }
 

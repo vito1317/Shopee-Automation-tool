@@ -1,4 +1,3 @@
-// popup.js
 document.addEventListener('DOMContentLoaded', () => {
     const switches = {
         master: { el: document.getElementById('masterSwitch'), key: 'masterEnabled', textEl: document.getElementById('masterStatusText'), default: true, label: '所有功能' },
@@ -8,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         checkout: { el: document.getElementById('featureCheckoutSwitch'), key: 'featureCheckoutEnabled', textEl: document.getElementById('featureCheckoutStatusText'), default: true, label: '自動結帳' },
         checkoutAction: { el: document.getElementById('featureCheckoutActionSwitch'), key: 'featureCheckoutAction', textEl: document.getElementById('featureCheckoutActionStatusText'), default: true, label: '↳ 動作', parentKey: 'checkout', type: 'action', container: document.getElementById('featureCheckoutActionContainer') },
-        tts: { el: document.getElementById('featureTTSSwitch'), key: 'featureTTSEnabled', textEl: document.getElementById('featureTTSStatusText'), default: true, label: '↳ TTS 語音播報', parentKey: 'checkout', type: 'sub-option', container: document.getElementById('featureTTSContainer') }, // 新增TTS開關配置
+        
+        tts: { el: document.getElementById('featureTTSSwitch'), key: 'featureTTSEnabled', textEl: document.getElementById('featureTTSStatusText'), default: true, label: 'TTS 語音播報', container: document.getElementById('featureTTSContainer') },
 
         boxScan: { el: document.getElementById('featureBoxScanSwitch'), key: 'featureBoxScanEnabled', textEl: document.getElementById('featureBoxScanStatusText'), default: true, label: '自動刷取物流箱單' },
 
@@ -166,7 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const changedKey = config.key;
 
                 saveState(changedKey, newState, (error) => {
-                    let parentIsEnabled = !config.parentKey || switches[config.parentKey]?.el?.checked;
+                    let parentIsEnabled = true;
+                    if (config.parentKey) {
+                        const parentConfig = switches[config.parentKey];
+                        parentIsEnabled = parentConfig?.el?.checked ?? true;
+                    }
                     updateStatusText(config, newState, parentIsEnabled);
                 });
 
