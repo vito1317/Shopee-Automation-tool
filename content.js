@@ -664,6 +664,10 @@ function speakTextArray(items) {
             } else if (/^\d{3}$/.test(textToSpeak) && !textToSpeak.startsWith("末三碼 ") && !textToSpeak.startsWith("櫃位 ")) {
                  textToSpeak = textToSpeak.split('').join(' ');
             }
+            
+            textToSpeak = textToSpeak.replace(/(櫃位\s+)?B(\d+)/g, (match, prefix, number) => {
+                return (prefix || '') + 'B ' + number;
+            });
 
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.lang = 'zh-TW';
