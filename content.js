@@ -10,6 +10,8 @@ let featureStates = {
     featureCheckoutAction: true,
     featureOneItemPerBoxEnabled: true,
     featureTTSEnabled: true,
+    featureTTSLocationEnabled: true,
+    featureTTSAmountEnabled: true
 };
 
 function loadFeatureStates() {
@@ -597,37 +599,53 @@ function processAndSpeakCheckoutData() {
     const itemsToSpeakInOrder = [];
     const newlyFoundItemsForConsoleLog = {};
 
-    if (newFormattedTexts.length > 0) {
-        newlyFoundItemsForConsoleLog["X-01 格式"] = [...newFormattedTexts];
-        const formattedCabinetCodes = newFormattedTexts.map(text => {
-            return text.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
-                return `${p1}${parseInt(p2, 10)}`;
-            });
-        });
+    if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled) {
+        if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
+            console.log("蝦皮自動化: TTS globally disabled, not speaking new data:", newlyFoundItemsForConsoleLog);
+        }
+        return;
+    }
 
-        if (formattedCabinetCodes.length > 0) {
-            itemsToSpeakInOrder.push("櫃位 " + formattedCabinetCodes[0]);
-            for (let i = 1; i < formattedCabinetCodes.length; i++) {
-                itemsToSpeakInOrder.push(formattedCabinetCodes[i]);
+    if (featureStates.featureTTSLocationEnabled) {
+        if (newFormattedTexts.length > 0) {
+            newlyFoundItemsForConsoleLog["X-01 格式"] = [...newFormattedTexts];
+            const formattedCabinetCodes = newFormattedTexts.map(text => {
+                return text.replace(/([A-Za-z])-(\d{2})/, (match, p1, p2) => {
+                    return `${p1}${parseInt(p2, 10)}`;
+                });
+            });
+
+            if (formattedCabinetCodes.length > 0) {
+                itemsToSpeakInOrder.push("櫃位 " + formattedCabinetCodes[0]);
+                for (let i = 1; i < formattedCabinetCodes.length; i++) {
+                    itemsToSpeakInOrder.push(formattedCabinetCodes[i]);
+                }
             }
+        }
+
+        if (newLastThreeDigits.length > 0) {
+            newlyFoundItemsForConsoleLog["後三碼"] = [...newLastThreeDigits];
+            itemsToSpeakInOrder.push(...newLastThreeDigits);
         }
     }
 
-    if (newLastThreeDigits.length > 0) {
-        newlyFoundItemsForConsoleLog["後三碼"] = [...newLastThreeDigits];
-        itemsToSpeakInOrder.push(...newLastThreeDigits);
-    }
-    if (newTotalCollectionValues.length > 0) {
-        newlyFoundItemsForConsoleLog["總收款金額"] = [...newTotalCollectionValues];
-        itemsToSpeakInOrder.push(...newTotalCollectionValues);
-    }
-    if (newChangeAmountsToSpeak.length > 0) {
-        newlyFoundItemsForConsoleLog["應找金額"] = [...newChangeAmountsToSpeak];
-        itemsToSpeakInOrder.push(...newChangeAmountsToSpeak);
+    if (featureStates.featureTTSAmountEnabled) {
+        if (newTotalCollectionValues.length > 0) {
+            newlyFoundItemsForConsoleLog["總收款金額"] = [...newTotalCollectionValues];
+            itemsToSpeakInOrder.push(...newTotalCollectionValues);
+        }
+        if (newChangeAmountsToSpeak.length > 0) {
+            newlyFoundItemsForConsoleLog["應找金額"] = [...newChangeAmountsToSpeak];
+            itemsToSpeakInOrder.push(...newChangeAmountsToSpeak);
+        }
     }
 
     if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
-        console.log("蝦皮自動化: 新發現待播報資料:", newlyFoundItemsForConsoleLog);
+         if (itemsToSpeakInOrder.length > 0) {
+            console.log("蝦皮自動化: 新發現待播報資料:", newlyFoundItemsForConsoleLog);
+        } else {
+            console.log("蝦皮自動化: 新發現資料，但對應TTS子功能未啟用:", newlyFoundItemsForConsoleLog);
+        }
     }
 
     if (itemsToSpeakInOrder.length > 0) {
@@ -668,6 +686,10 @@ function speakTextArray(items) {
             textToSpeak = textToSpeak.replace(/(櫃位\s+)?B(\d+)/g, (match, prefix, number) => {
                 return (prefix || '') + 'B ' + number;
             });
+
+            if (textToSpeak.startsWith("櫃位 ")) {
+                textToSpeak = textToSpeak.replace(/D/g, '豬');
+            }
 
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.lang = 'zh-TW';
@@ -752,7 +774,8 @@ function autoCheckout() {
     const ALL_FEATURE_STORAGE_KEYS_FOR_LISTENER = [
          'masterEnabled', 'featureQueueingEnabled', 'featureCheckoutEnabled',
          'featureBoxScanEnabled', 'featureNextDayEnabled', 'featureNextDayAutoStartEnabled',
-         'featureFileScanEnabled', 'featureOneItemPerBoxEnabled', 'featureTTSEnabled'
+         'featureFileScanEnabled', 'featureOneItemPerBoxEnabled', 'featureTTSEnabled',
+         'featureTTSLocationEnabled', 'featureTTSAmountEnabled'
     ];
 
     async function getFeatureStatesFromContent() {

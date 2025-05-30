@@ -7,7 +7,9 @@ const FEATURE_KEYS = [
     'featureNextDayAutoStartEnabled',
     'featureCheckoutEnabled',
     'featureOneItemPerBoxEnabled',
-    'featureTTSEnabled'
+    'featureTTSEnabled',
+    'featureTTSLocationEnabled',
+    'featureTTSAmountEnabled'
 ];
 
 const ALARM_NAME = 'disableFeaturesAtMidnight';
@@ -29,14 +31,17 @@ function disableAllFeatures() {
 
 function scheduleAlarm() {
     const now = new Date();
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
 
-    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+    let nextMidnightRunTime = new Date();
+    nextMidnightRunTime.setUTCHours(16, 0, 0, 0); 
+
+    if (now.getTime() >= nextMidnightRunTime.getTime()) {
+        nextMidnightRunTime.setUTCDate(nextMidnightRunTime.getUTCDate() + 1);
+    }
 
     chrome.alarms.clear(ALARM_NAME, (wasCleared) => {
         chrome.alarms.create(ALARM_NAME, {
-            when: Date.now() + msUntilMidnight
+            when: nextMidnightRunTime.getTime()
         });
     });
 }

@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
         checkoutAction: { el: document.getElementById('featureCheckoutActionSwitch'), key: 'featureCheckoutAction', textEl: document.getElementById('featureCheckoutActionStatusText'), default: true, label: '↳ 動作', parentKey: 'checkout', type: 'action', container: document.getElementById('featureCheckoutActionContainer') },
         
         tts: { el: document.getElementById('featureTTSSwitch'), key: 'featureTTSEnabled', textEl: document.getElementById('featureTTSStatusText'), default: true, label: 'TTS 語音播報', container: document.getElementById('featureTTSContainer') },
+        ttsLocation: { el: document.getElementById('featureTTSLocationSwitch'), key: 'featureTTSLocationEnabled', textEl: document.getElementById('featureTTSLocationStatusText'), default: true, label: '↳ 播報櫃位/末三碼', parentKey: 'tts', type: 'sub-option', container: document.getElementById('featureTTSLocationContainer') },
+        ttsAmount: { el: document.getElementById('featureTTSAmountSwitch'), key: 'featureTTSAmountEnabled', textEl: document.getElementById('featureTTSAmountStatusText'), default: true, label: '↳ 播報金額', parentKey: 'tts', type: 'sub-option', container: document.getElementById('featureTTSAmountContainer') },
 
         boxScan: { el: document.getElementById('featureBoxScanSwitch'), key: 'featureBoxScanEnabled', textEl: document.getElementById('featureBoxScanStatusText'), default: true, label: '自動刷取物流箱單' },
 
@@ -60,12 +62,15 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
 
-        const parentConfig = Object.values(switches).find(p => p.key === childConfig.parentKey);
+        const parentConfigKey = childConfig.parentKey;
+        const parentConfig = Object.values(switches).find(p => p.key === parentConfigKey || (p.el && p.el.id === parentConfigKey + 'Switch'));
+
         const parentIsEnabled = parentConfig?.el?.checked ?? true;
 
         childConfig.el.disabled = !parentIsEnabled;
         updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
     }
+
 
     function loadAllStates() {
         const keysToGet = {};
@@ -76,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.get(keysToGet, (data) => {
             const lastError = chrome.runtime.lastError;
             if (lastError || !data) {
-                console.error("Popup: Error loading states:", lastError?.message || "No data received");
                  Object.values(switches).forEach(config => {
                      if(config.el) config.el.checked = config.default;
                      if(config.textEl && document.body.contains(config.textEl)) {
@@ -112,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.set({ [key]: value }, () => {
             const lastError = chrome.runtime.lastError;
             if (lastError && !lastError.message?.includes("message port closed")) {
-                console.error(`Popup: Error saving state for ${key}:`, lastError.message || lastError);
             }
             if (typeof callback === 'function') {
                 if (!lastError || !lastError.message?.includes("message port closed")) {
@@ -168,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveState(changedKey, newState, (error) => {
                     let parentIsEnabled = true;
                     if (config.parentKey) {
-                        const parentConfig = switches[config.parentKey];
+                        const parentConfigKey = config.parentKey;
+                        const parentConfig = Object.values(switches).find(p => p.key === parentConfigKey || (p.el && p.el.id === parentConfigKey + 'Switch'));
                         parentIsEnabled = parentConfig?.el?.checked ?? true;
                     }
                     updateStatusText(config, newState, parentIsEnabled);
@@ -184,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             Object.values(switches).forEach(subConfig => {
                                 if (subConfig.parentKey === childConfig.key) updateChildSwitchUI(subConfig);
                             });
+                        } else if (childConfig.parentKey === switches.master.key) {
+                             updateChildSwitchUI(childConfig);
                         }
                     });
                 } else if (!config.parentKey) {
