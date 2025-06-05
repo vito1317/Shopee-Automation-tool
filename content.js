@@ -320,16 +320,25 @@ function checkAndClickNextDay() {
 
         const buttons = document.querySelectorAll('.ssc-button.ssc-btn-type-primary:not(.ssc-btn-plain)');
         buttons.forEach(button => {
-             if (!button.dataset.nextDayBtnListenerAdded) {
-                 button.addEventListener('click', function() {
-                     if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
+            if (button.textContent.trim() === '完成') { 
+                const listenerMarker = 'myCustomCompletionListener'; 
+                if (!button.dataset[listenerMarker]) {
+                    button.addEventListener('click', function () {
+                        if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
 
-                    if (featureStates.featureNextDayAutoStartEnabled) {
-                        executeAfterTwoSscMessages();
-                    }
-                 });
-                 button.dataset.nextDayBtnListenerAdded = "true";
-             }
+                        if (featureStates.featureNextDayEnabled) {
+                            setTimeout(() => {
+                                const btnDistance = document.querySelector('.ssc-button.btn-distance');
+                                if (btnDistance) {
+                                    btnDistance.click();
+                                }
+                            }, 300);
+                            executeAfterTwoSscMessages(); 
+                        }
+                    });
+                    button.dataset[listenerMarker] = "true"; 
+                }
+            }
         });
     }
 }
@@ -601,7 +610,6 @@ function processAndSpeakCheckoutData() {
 
     if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled) {
         if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
-            console.log("蝦皮自動化: TTS globally disabled, not speaking new data:", newlyFoundItemsForConsoleLog);
         }
         return;
     }
@@ -642,9 +650,7 @@ function processAndSpeakCheckoutData() {
 
     if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
          if (itemsToSpeakInOrder.length > 0) {
-            console.log("蝦皮自動化: 新發現待播報資料:", newlyFoundItemsForConsoleLog);
         } else {
-            console.log("蝦皮自動化: 新發現資料，但對應TTS子功能未啟用:", newlyFoundItemsForConsoleLog);
         }
     }
 
@@ -662,7 +668,6 @@ function speakTextArray(items) {
         return;
     }
     if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') {
-        console.warn("蝦皮自動化: 瀏覽器不支援 SpeechSynthesis API。");
         return;
     }
     speechSynthesis.cancel();
@@ -699,7 +704,6 @@ function speakTextArray(items) {
                 setTimeout(speakNext, 300);
             };
             utterance.onerror = (event) => {
-                console.error("蝦皮自動化: SpeechSynthesisUtterance 錯誤", event.error);
                 currentIndex++;
                 setTimeout(speakNext, 300);
             };
@@ -816,7 +820,7 @@ function autoCheckout() {
         const s=document.createElement('script');
         s.src=html5QrCodePath;
         s.onload=()=>{
-            if(typeof Html5Qrcode==='undefined') console.error('Html5Qrcode undef after load!');
+            if(typeof Html5Qrcode==='undefined') {}
             else if(!librariesLoaded&&librariesCheckInterval) checkLibrariesAndInit();
         };
         s.onerror=e=>{
@@ -1016,9 +1020,9 @@ function autoCheckout() {
             if (batchScanErrors.length > 0) {
                 displayBatchErrorSummary();
             } else if (totalFilesInBatch > 0 && totalSimulatedInBatch === 0) {
-                updateStatusSpan(`完成 ${totalFilesInBatch} 個檔案，未找到可模擬的條碼。`, 'orange', true);
+                updateStatusSpan(`完成 ${totalFilesInBatch} 個檔案，未找到可輸入的條碼。`, 'orange', true);
             } else if (totalFilesInBatch > 0 && totalSimulatedInBatch > 0) {
-                 updateStatusSpan(`完成 ${totalFilesInBatch} 個檔案，已模擬 ${totalSimulatedInBatch} 個條碼。`, 'green', true);
+                 updateStatusSpan(`完成 ${totalFilesInBatch} 個檔案，已輸入 ${totalSimulatedInBatch} 個條碼。`, 'green', true);
             } else {
                  updateStatusSpan('請選擇檔案','grey');
             }
@@ -1078,7 +1082,7 @@ function autoCheckout() {
 
         let summary = "";
         if (totalSimulatedInBatch > 0) {
-            summary += `成功模擬輸入 ${totalSimulatedInBatch} 件。\n`;
+            summary += `成功輸入 ${totalSimulatedInBatch} 件。\n`;
         }
 
         if (batchScanErrors.length > 0) {
@@ -1117,7 +1121,7 @@ function autoCheckout() {
                 if (errorsToDisplay.length > 5) summary += `...等其他 ${errorsToDisplay.length - 5} 個問題 (詳見控制台)。\n`;
             }
         } else if (totalFilesInBatch > 0 && totalSimulatedInBatch === 0 && batchScanErrors.length === 0) {
-             summary += `完成 ${totalFilesInBatch} 個檔案，未找到可模擬的條碼。\n`;
+             summary += `完成 ${totalFilesInBatch} 個檔案，未找到可輸入的條碼。\n`;
         }
 
 
@@ -1329,22 +1333,22 @@ function autoCheckout() {
         }
 
         if (codesFoundByQRThisFunc.length > 0) {
-            updateStatusSpan(statusPrefix + `QR掃描找到 ${codesFoundByQRThisFunc.length} 個新條碼，模擬輸入中...`, 'blue');
+            updateStatusSpan(statusPrefix + `QR掃描找到 ${codesFoundByQRThisFunc.length} 個新條碼，輸入中...`, 'blue');
             for (let i = 0; i < codesFoundByQRThisFunc.length; i++) {
                 const code = codesFoundByQRThisFunc[i];
                 const simState = await getFeatureStatesFromContent();
                 if (!simState.masterEnabled || !simState.featureFileScanEnabled) {
                     addBatchScanError(fileNameForReport, null, 'Simulate QR', 'Cancelled', '功能已停用');
-                    updateStatusSpan(statusPrefix + "QR模擬輸入已取消(功能停用)", "orange");
+                    updateStatusSpan(statusPrefix + "QR輸入輸入已取消(功能停用)", "orange");
                     break;
                 }
                 try {
                     await simulateBarcodeInput(code, fileNameForReport);
                     totalSimulatedInBatch++;
-                    updateStatusSpan(statusPrefix + `已模擬QR條碼 ${code.substring(0,6)}... (${i+1}/${codesFoundByQRThisFunc.length})`, 'grey');
+                    updateStatusSpan(statusPrefix + `已輸入QR條碼 ${code.substring(0,6)}... (${i+1}/${codesFoundByQRThisFunc.length})`, 'grey');
                     await new Promise(r => setTimeout(r, 500));
                 } catch (simError) {
-                    updateStatusSpan(statusPrefix + `模擬QR條碼 ${code.substring(0,6)}... 失敗`, 'red');
+                    updateStatusSpan(statusPrefix + `輸入QR條碼 ${code.substring(0,6)}... 失敗`, 'red');
                 }
             }
             const postSimState = await getFeatureStatesFromContent();
@@ -1395,23 +1399,23 @@ function autoCheckout() {
                     }
 
                     if (foundTextCodes.size > 0) {
-                        updateStatusSpan(statusPrefix + `PDF文字中找到 ${foundTextCodes.size} 個條碼，模擬輸入中...`, 'blue');
+                        updateStatusSpan(statusPrefix + `PDF文字中找到 ${foundTextCodes.size} 個條碼，輸入中...`, 'blue');
                         let simulatedCount = 0;
                         for (const code of foundTextCodes) {
                              currentRuntimeFeatureStates = await getFeatureStatesFromContent();
                              if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                                 addBatchScanError(fileNameForReport, null, 'Simulate Text', 'Cancelled', '功能已停用');
-                                updateStatusSpan(statusPrefix + "文字條碼模擬輸入已取消", "orange");
+                                updateStatusSpan(statusPrefix + "文字條碼輸入已取消", "orange");
                                 break;
                              }
                             try {
                                 await simulateBarcodeInput(code, fileNameForReport);
                                 totalSimulatedInBatch++;
                                 simulatedCount++;
-                                updateStatusSpan(statusPrefix + `已模擬文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
+                                updateStatusSpan(statusPrefix + `已輸入文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
                                 await new Promise(r => setTimeout(r, 500));
                             } catch (simError) {
-                                updateStatusSpan(statusPrefix + `模擬文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
+                                updateStatusSpan(statusPrefix + `輸入文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
                             }
                         }
                         currentRuntimeFeatureStates = await getFeatureStatesFromContent();
@@ -1463,7 +1467,7 @@ function autoCheckout() {
                     const titleTxt=titles.join('\n');
                     const combinedTextContent=`${body}\n${titleTxt}`;
 
-                    updateStatusSpan(statusPrefix+'HTML解析完成, 模擬條碼 (如果找到)..','grey');
+                    updateStatusSpan(statusPrefix+'HTML解析完成, 輸入條碼 (如果找到)..','grey');
                     const twBarcodeRegex = /TW[A-Z0-9]{13}/g;
                     let match; const foundCodes = new Set();
                     while ((match = twBarcodeRegex.exec(combinedTextContent)) !== null) {
@@ -1471,22 +1475,22 @@ function autoCheckout() {
                     }
 
                     if (foundCodes.size > 0) {
-                        updateStatusSpan(statusPrefix + `HTML中找到 ${foundCodes.size} 個條碼，模擬輸入中...`, 'blue');
+                        updateStatusSpan(statusPrefix + `HTML中找到 ${foundCodes.size} 個條碼，輸入中...`, 'blue');
                         let simulatedCount = 0;
                         for (const code of foundCodes) {
                              currentRuntimeFeatureStates = await getFeatureStatesFromContent();
                              if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                                 addBatchScanError(fileNameForReport, null, 'HTML Sim', 'Cancelled', '功能已停用');
-                                updateStatusSpan(statusPrefix + "HTML模擬輸入已取消", "orange");
+                                updateStatusSpan(statusPrefix + "HTML輸入已取消", "orange");
                                 break;
                              }
                             try {
                                 await simulateBarcodeInput(code, fileNameForReport);
                                 totalSimulatedInBatch++; simulatedCount++;
-                                updateStatusSpan(statusPrefix + `已模擬HTML條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundCodes.size})`, 'grey');
+                                updateStatusSpan(statusPrefix + `已輸入HTML條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundCodes.size})`, 'grey');
                                 await new Promise(r => setTimeout(r, 500));
                             } catch (simError) {
-                                updateStatusSpan(statusPrefix + `HTML模擬 ${code.substring(0,6)}... 失敗`, 'red');
+                                updateStatusSpan(statusPrefix + `HTML輸入 ${code.substring(0,6)}... 失敗`, 'red');
                             }
                         }
                         currentRuntimeFeatureStates = await getFeatureStatesFromContent();
