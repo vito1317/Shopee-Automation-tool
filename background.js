@@ -9,7 +9,8 @@ const FEATURE_KEYS = [
     'featureOneItemPerBoxEnabled',
     'featureTTSEnabled',
     'featureTTSLocationEnabled',
-    'featureTTSAmountEnabled'
+    'featureTTSAmountEnabled',
+    'featureNextDayAutoScanEnabled'
 ];
 
 const ALARM_NAME = 'disableFeaturesAtMidnight';

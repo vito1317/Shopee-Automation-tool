@@ -31,12 +31,13 @@
             "libs/pdf.worker.min.js",
             "content.js"         
         ],
-        "run_at": "document_idle"
+        "run_at": "document_start"
       }
     ],
     "web_accessible_resources": [
       {
         "resources": [
+            "interceptor.js",
             "libs/html5-qrcode.min.js",
             "libs/pdf.min.js",
             "libs/pdf.worker.min.js"

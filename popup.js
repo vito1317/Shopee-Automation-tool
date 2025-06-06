@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
         nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureNextDayAutoStartContainer') },
         oneItemPerBox: { el: document.getElementById('featureOneItemPerBoxSwitch'), key: 'featureOneItemPerBoxEnabled', textEl: document.getElementById('featureOneItemPerBoxStatusText'), default: true, label: '↳ 一件一箱自動裝箱', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureOneItemPerBoxContainer') },
 
+        nextDayAutoScan: { el: document.getElementById('featureNextDayAutoScanSwitch'), key: 'featureNextDayAutoScanEnabled', textEl: document.getElementById('featureNextDayAutoScanStatusText'), default: true, label: '隔日自動刷件' },
+        
         fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
     };
 
