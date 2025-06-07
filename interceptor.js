@@ -1,11 +1,15 @@
 (function() {
     'use strict';
 
+    const originalFetch = window.fetch;
+    const originalXhrOpen = XMLHttpRequest.prototype.open;
+    const originalXhrSend = XMLHttpRequest.prototype.send;
+    const originalAudio = window.Audio;
+
     let featureStates = {
         masterEnabled: false,
         featureNextDayAutoScanEnabled: false
     };
-
     document.addEventListener('extension-settings-loaded', (event) => {
         if (event.detail) {
             featureStates = event.detail;
@@ -16,34 +20,16 @@
     const INVALID_ORDER_RETCODE = 1501010;
     const SUCCESS_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/success-alert.c7545e0a.mp3';
     const FAILURE_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/failure-alert.3a69fd73.mp3';
-
     const retryingShipmentIds = new Set();
     let messageTimeoutId = null;
 
-    const originalAudio = window.Audio;
     window.Audio = function(url) {
-        console.log(url)
+        return { play: () => {} };
         if (url && typeof url === 'string' && url.includes('failure-alert')) {
             return { play: () => {} };
         }
         return new originalAudio(url);
     };
-
-    const observer = new MutationObserver((mutationsList) => {
-        const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
-        if (!isEnabled) return;
-
-        for (const mutation of mutationsList) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
-                    if (node.isBeingHandledByExtension) continue;
-                    node.isBeingHandledByExtension = true;
-                    takeoverMessage(node, "正在嘗試刷件", 'success');
-                }
-            }
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
 
     function takeoverMessage(targetBox, text, iconType) {
         if (!targetBox) return;
@@ -77,19 +63,56 @@
         } catch (e) {}
     }
 
-    function generateRandomDrtId() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const dateString = `${year}${month}${day}`;
-        const randomDigit = Math.floor(Math.random() * 10);
-        let randomChars = '';
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        for (let i = 0; i < 4; i++) {
-            randomChars += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+    const observer = new MutationObserver((mutationsList) => {
+        const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
+        if (!isEnabled) return;
+        for (const mutation of mutationsList) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
+                    if (node.isBeingHandledByExtension) continue;
+                    node.isBeingHandledByExtension = true;
+                    takeoverMessage(node, "正在嘗試刷件", 'success');
+                }
+            }
         }
-        return `DRT${dateString}${randomDigit}${randomChars}`;
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    async function fetchValidDrtId() {
+        try {
+            const checkUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/create_check?task_type=0';
+            const checkResponse = await originalFetch(checkUrl, {
+                method: 'GET'
+            });
+
+            if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                if (checkData.retcode === 0 && checkData.data) {
+                    const taskId = checkData.data.receive_task_id || checkData.data.existed_task_id;
+                    if (taskId) {
+                        return taskId;
+                    }
+                }
+            }
+
+            const createUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/create';
+            const createResponse = await originalFetch(createUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_type: 0 })
+            });
+
+            if (createResponse.ok) {
+                const createData = await createResponse.json();
+                if (createData.retcode === 0 && createData.data && createData.data.task_id) {
+                    return createData.data.task_id;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            return null;
+        }
     }
 
     async function performFixAndRetry(originalBody) {
@@ -101,22 +124,35 @@
             if (!shipmentId || retryingShipmentIds.has(shipmentId)) {
                 return { success: false };
             }
-            
             retryingShipmentIds.add(shipmentId);
-            const receiveTaskId = generateRandomDrtId();
+            
+            const receiveTaskId = await fetchValidDrtId();
+            if (!receiveTaskId) return { success: false };
             
             const receiveTaskUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/order/add';
             const receiveTaskBody = { order_id: shipmentId, receive_task_id: receiveTaskId };
-            const fixResponse = await fetch(receiveTaskUrl, {
+            const fixResponse = await originalFetch(receiveTaskUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(receiveTaskBody)
             });
-
             if (!fixResponse.ok) return { success: false };
 
+            const completeTaskUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/complete';
+            const completeTaskBody = {
+                esf_flag: false,
+                receive_task_id: receiveTaskId,
+                operation_info: { operation_mode: 2, operation_device: 1 }
+            };
+            const completeResponse = await originalFetch(completeTaskUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(completeTaskBody)
+            });
+            if (!completeResponse.ok) return { success: false };
+
             const originalUrl = 'https://sp.spx.shopee.tw' + TARGET_URL_PART;
-            const retryResponse = await fetch(originalUrl, {
+            const retryResponse = await originalFetch(originalUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: originalBody
@@ -126,7 +162,6 @@
                 const retryResponseText = await retryResponse.text();
                 const retryResponseData = JSON.parse(retryResponseText);
                 const messageBox = Array.from(document.querySelectorAll('.ssc-message')).find(m => m.textContent.includes('正在嘗試刷件'));
-
                 if (retryResponseData.retcode === INVALID_ORDER_RETCODE) {
                     takeoverMessage(messageBox, "無效訂單", 'error');
                     return { success: false }; 
@@ -144,9 +179,6 @@
             }
         }
     }
-
-    const originalXhrOpen = XMLHttpRequest.prototype.open;
-    const originalXhrSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
         this._requestMethod = method;
@@ -181,7 +213,6 @@
         return originalXhrSend.apply(this, arguments);
     };
 
-    const originalFetch = window.fetch;
     window.fetch = async function(...args) {
         const [urlOrRequest, config] = args;
         const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
