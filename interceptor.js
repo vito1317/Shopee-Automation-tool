@@ -47,7 +47,7 @@
             const receiveTaskId = generateRandomDrtId();
             
             const receiveTaskUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/order/add';
-            const receiveTaskBody = { order_id: shipmentId, receive_task_id: receiveTaskId };
+            const receiveTaskBody = { order_id: shipmentId, receive_task_id: receiveTaskId, scene: "forward_dropoff"};
             const fixResponse = await fetch(receiveTaskUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
