@@ -72,7 +72,7 @@
                         modifyMessage(node, "正在嘗試刷件", 'success');
                         return;
                     }
-                    if (isExpectingSuccessMessage && node.querySelector('.ssc-message-success')) {
+                    if (isExpectingSuccessMessage && node.querySelector('.ssc-message')) {
                         isExpectingSuccessMessage = false;
                         modifyMessage(node, "已成功自動刷件，並裝箱", 'success');
                         playSound(SUCCESS_SOUND_URL);
