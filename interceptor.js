@@ -67,12 +67,12 @@
         for (const mutation of mutationsList) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message')) {
-                    if (isExpectingInvalidOrderMessage && node.textContent.includes('無效訂單')) {
+                    if (isExpectingInvalidOrderMessage && node.textContent == '無效訂單') {
                         isExpectingInvalidOrderMessage = false;
                         modifyMessage(node, "正在嘗試刷件", 'success');
                         return;
                     }
-                    if (isExpectingSuccessMessage && node.querySelector('.ssc-message')) {
+                    if (isExpectingSuccessMessage && node.textContent.includes('成功')) {
                         isExpectingSuccessMessage = false;
                         modifyMessage(node, "已成功自動刷件，並裝箱", 'success');
                         playSound(SUCCESS_SOUND_URL);
