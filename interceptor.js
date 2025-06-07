@@ -10,9 +10,13 @@
         masterEnabled: false,
         featureNextDayAutoScanEnabled: false
     };
+    
+    let isExpectingInvalidOrderMessage = false;
+
     document.addEventListener('extension-settings-loaded', (event) => {
         if (event.detail) {
             featureStates = event.detail;
+            document.documentElement.dataset.extensionFeatures = JSON.stringify(featureStates);
         }
     });
 
@@ -24,7 +28,6 @@
     let messageTimeoutId = null;
 
     window.Audio = function(url) {
-        return { play: () => {} };
         if (url && typeof url === 'string' && url.includes('failure-alert')) {
             return { play: () => {} };
         }
@@ -44,9 +47,7 @@
             <p class="ssc-message-content" style="font-size: 14px; margin: 0; color: #333;">${text}</p>
         `;
 
-        if (iconType === 'success') {
-            playSound(SUCCESS_SOUND_URL);
-        } else if (iconType === 'error') {
+        if (iconType === 'error') {
             playSound(FAILURE_SOUND_URL);
         }
 
@@ -64,34 +65,40 @@
     }
 
     const observer = new MutationObserver((mutationsList) => {
-        const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
-        if (!isEnabled) return;
+        if (!isExpectingInvalidOrderMessage) return;
+
         for (const mutation of mutationsList) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
-                    if (node.isBeingHandledByExtension) continue;
-                    node.isBeingHandledByExtension = true;
                     takeoverMessage(node, "正在嘗試刷件", 'success');
+                    isExpectingInvalidOrderMessage = false; 
+                    return;
                 }
             }
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
+    async function getFeatureStateAsync() {
+        const data = document.documentElement.dataset.extensionFeatures;
+        if (data) {
+            return JSON.parse(data);
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const finalData = document.documentElement.dataset.extensionFeatures;
+        return finalData ? JSON.parse(finalData) : featureStates;
+    }
+
     async function fetchValidDrtId() {
         try {
             const checkUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/create_check?task_type=0';
-            const checkResponse = await originalFetch(checkUrl, {
-                method: 'GET'
-            });
+            const checkResponse = await originalFetch(checkUrl, { method: 'GET' });
 
             if (checkResponse.ok) {
                 const checkData = await checkResponse.json();
                 if (checkData.retcode === 0 && checkData.data) {
                     const taskId = checkData.data.receive_task_id || checkData.data.existed_task_id;
-                    if (taskId) {
-                        return taskId;
-                    }
+                    if (taskId) return taskId;
                 }
             }
 
@@ -108,7 +115,6 @@
                     return createData.data.task_id;
                 }
             }
-            
             return null;
         } catch (error) {
             return null;
@@ -162,11 +168,13 @@
                 const retryResponseText = await retryResponse.text();
                 const retryResponseData = JSON.parse(retryResponseText);
                 const messageBox = Array.from(document.querySelectorAll('.ssc-message')).find(m => m.textContent.includes('正在嘗試刷件'));
+
                 if (retryResponseData.retcode === INVALID_ORDER_RETCODE) {
                     takeoverMessage(messageBox, "無效訂單", 'error');
                     return { success: false }; 
                 } else {
                     takeoverMessage(messageBox, "已自動刷件", 'success');
+                    playSound(SUCCESS_SOUND_URL);
                     return { success: true, responseText: retryResponseText };
                 }
             }
@@ -186,8 +194,10 @@
         return originalXhrOpen.apply(this, arguments);
     };
 
-    XMLHttpRequest.prototype.send = function(body) {
-        const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
+    XMLHttpRequest.prototype.send = async function(body) {
+        const localStates = await getFeatureStateAsync();
+        const isEnabled = localStates.masterEnabled && localStates.featureNextDayAutoScanEnabled;
+
         if (isEnabled && this._requestUrl && this._requestUrl.includes(TARGET_URL_PART) && this._requestMethod.toUpperCase() === 'POST') {
             const originalXhr = this;
             const originalOnReadyStateChange = this.onreadystatechange;
@@ -196,6 +206,7 @@
                     try {
                         const responseData = JSON.parse(originalXhr.responseText);
                         if (responseData.retcode === INVALID_ORDER_RETCODE) {
+                            isExpectingInvalidOrderMessage = true;
                             const retryResult = await performFixAndRetry(body);
                             if (retryResult.success) {
                                 Object.defineProperty(originalXhr, 'responseText', { value: retryResult.responseText, writable: true });
@@ -215,9 +226,11 @@
 
     window.fetch = async function(...args) {
         const [urlOrRequest, config] = args;
-        const isEnabled = featureStates.masterEnabled && featureStates.featureNextDayAutoScanEnabled;
+        const localStates = await getFeatureStateAsync();
+        const isEnabled = localStates.masterEnabled && localStates.featureNextDayAutoScanEnabled;
         const url = (typeof urlOrRequest === 'string') ? urlOrRequest : urlOrRequest.url;
         const method = (config?.method || urlOrRequest?.method)?.toUpperCase();
+
         if (isEnabled && url.includes(TARGET_URL_PART) && method === 'POST') {
             try {
                 const request = new Request(urlOrRequest, config);
@@ -226,6 +239,7 @@
                 const responseClone = response.clone();
                 const responseData = await responseClone.json();
                 if (responseData.retcode === INVALID_ORDER_RETCODE) {
+                    isExpectingInvalidOrderMessage = true;
                     const retryResult = await performFixAndRetry(await requestClone.text());
                     if (retryResult.success) {
                         return new Response(retryResult.responseText, {
