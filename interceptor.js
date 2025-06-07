@@ -24,6 +24,8 @@
     const INVALID_ORDER_RETCODE = 1501010;
     const SUCCESS_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/success-alert.c7545e0a.mp3';
     const FAILURE_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/failure-alert.3a69fd73.mp3';
+    const RETRY_DELAY_MS = 200; // 延遲 200 毫秒
+
     const retryingShipmentIds = new Set();
     let messageTimeoutId = null;
 
@@ -66,7 +68,6 @@
 
     const observer = new MutationObserver((mutationsList) => {
         if (!isExpectingInvalidOrderMessage) return;
-
         for (const mutation of mutationsList) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
@@ -81,9 +82,7 @@
 
     async function getFeatureStateAsync() {
         const data = document.documentElement.dataset.extensionFeatures;
-        if (data) {
-            return JSON.parse(data);
-        }
+        if (data) return JSON.parse(data);
         await new Promise(resolve => setTimeout(resolve, 50));
         const finalData = document.documentElement.dataset.extensionFeatures;
         return finalData ? JSON.parse(finalData) : featureStates;
@@ -93,7 +92,6 @@
         try {
             const checkUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/create_check?task_type=0';
             const checkResponse = await originalFetch(checkUrl, { method: 'GET' });
-
             if (checkResponse.ok) {
                 const checkData = await checkResponse.json();
                 if (checkData.retcode === 0 && checkData.data) {
@@ -108,7 +106,6 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ task_type: 0 })
             });
-
             if (createResponse.ok) {
                 const createData = await createResponse.json();
                 if (createData.retcode === 0 && createData.data && createData.data.task_id) {
@@ -156,6 +153,8 @@
                 body: JSON.stringify(completeTaskBody)
             });
             if (!completeResponse.ok) return { success: false };
+
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
 
             const originalUrl = 'https://sp.spx.shopee.tw' + TARGET_URL_PART;
             const retryResponse = await originalFetch(originalUrl, {
