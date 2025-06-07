@@ -12,6 +12,7 @@
     };
     
     let isExpectingInvalidOrderMessage = false;
+    let isExpectingSuccessMessage = false;
 
     document.addEventListener('extension-settings-loaded', (event) => {
         if (event.detail) {
@@ -36,7 +37,7 @@
         return new originalAudio(url);
     };
 
-    function takeoverMessage(targetBox, text, iconType) {
+    function modifyMessage(targetBox, text, iconType) {
         if (!targetBox) return;
         if (messageTimeoutId) clearTimeout(messageTimeoutId);
 
@@ -48,10 +49,6 @@
             ${iconType === 'success' ? successIcon : errorIcon}
             <p class="ssc-message-content" style="font-size: 14px; margin: 0; color: #333;">${text}</p>
         `;
-
-        if (iconType === 'error') {
-            playSound(FAILURE_SOUND_URL);
-        }
 
         messageTimeoutId = setTimeout(() => {
             if (targetBox) {
@@ -67,13 +64,20 @@
     }
 
     const observer = new MutationObserver((mutationsList) => {
-        if (!isExpectingInvalidOrderMessage) return;
         for (const mutation of mutationsList) {
             for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
-                    takeoverMessage(node, "正在嘗試刷件", 'success');
-                    isExpectingInvalidOrderMessage = false; 
-                    return;
+                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message')) {
+                    if (isExpectingInvalidOrderMessage && node.textContent.includes('無效訂單')) {
+                        isExpectingInvalidOrderMessage = false;
+                        modifyMessage(node, "正在嘗試刷件", 'success');
+                        return;
+                    }
+                    if (isExpectingSuccessMessage && node.querySelector('.ssc-message-success')) {
+                        isExpectingSuccessMessage = false;
+                        modifyMessage(node, "已成功自動刷件，並裝箱", 'success');
+                        playSound(SUCCESS_SOUND_URL);
+                        return;
+                    }
                 }
             }
         }
@@ -99,7 +103,6 @@
                     if (taskId) return taskId;
                 }
             }
-
             const createUrl = 'https://sp.spx.shopee.tw/sp-api/point/dop/receive_task/create';
             const createResponse = await originalFetch(createUrl, {
                 method: 'POST',
@@ -166,14 +169,14 @@
             if (retryResponse.ok) {
                 const retryResponseText = await retryResponse.text();
                 const retryResponseData = JSON.parse(retryResponseText);
-                const messageBox = Array.from(document.querySelectorAll('.ssc-message')).find(m => m.textContent.includes('正在嘗試刷件'));
-
+                
                 if (retryResponseData.retcode === INVALID_ORDER_RETCODE) {
-                    takeoverMessage(messageBox, "無效訂單", 'error');
+                    const messageBox = Array.from(document.querySelectorAll('.ssc-message')).find(m => m.textContent.includes('正在嘗試刷件'));
+                    modifyMessage(messageBox, "無效訂單", 'error');
+                    playSound(FAILURE_SOUND_URL);
                     return { success: false }; 
                 } else {
-                    takeoverMessage(messageBox, "已自動刷件", 'success');
-                    playSound(SUCCESS_SOUND_URL);
+                    isExpectingSuccessMessage = true;
                     return { success: true, responseText: retryResponseText };
                 }
             }

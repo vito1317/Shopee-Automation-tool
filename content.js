@@ -32,6 +32,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 featureNextDayAutoScanEnabled: states.featureNextDayAutoScanEnabled
             }
         });
+        document.documentElement.dataset.extensionFeatures = JSON.stringify(event.detail);
         document.dispatchEvent(event);
     }
 
@@ -78,7 +79,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
-            if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) {
+            if (!featureStates.masterEnabled) {
                 stopNextDayFeature();
             } else {
                 startNextDayFeature();
@@ -94,6 +95,12 @@ window.addEventListener('DOMContentLoaded', () => {
             const oneItemPerBoxCheckbox = document.getElementById('oneItemPerBoxFocusCheckbox');
             if (oneItemPerBoxCheckbox && oneItemPerBoxCheckbox.checked !== featureStates.featureOneItemPerBoxEnabled) {
                 oneItemPerBoxCheckbox.checked = featureStates.featureOneItemPerBoxEnabled;
+            }
+        }
+        if (featureStates.hasOwnProperty('featureNextDayAutoScanEnabled')) {
+            const nextDayAutoScanCheckbox = document.getElementById('nextDayAutoScanCheckbox');
+            if (nextDayAutoScanCheckbox && nextDayAutoScanCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
+                nextDayAutoScanCheckbox.checked = featureStates.featureNextDayAutoScanEnabled;
             }
         }
 
@@ -238,7 +245,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let oneItemPerBoxCheckInterval = null;
 
     function startNextDayFeature() {
-        if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) {
+        if (!featureStates.masterEnabled) {
             stopNextDayFeature();
             return;
         }
@@ -249,18 +256,22 @@ window.addEventListener('DOMContentLoaded', () => {
             const currentUrl = window.location.href;
 
             if (currentUrl.includes(targetUrl)) {
-                runCodeIfUrlContains(targetUrl, function() {
-                     if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
+                if (featureStates.featureNextDayEnabled) {
                     checkAndClickNextDay();
                     addOrUpdateNextDayCheckbox();
                     addOrUpdateOneItemPerBoxCheckbox();
                     if (featureStates.featureOneItemPerBoxEnabled) {
                         autoFocusForSingleItem();
                     }
-                });
+                } else {
+                    removeNextDayCheckbox();
+                    removeOneItemPerBoxCheckbox();
+                }
+                addOrUpdateNextDayAutoScanCheckbox();
             } else {
                 removeNextDayCheckbox();
                 removeOneItemPerBoxCheckbox();
+                removeNextDayAutoScanCheckbox();
                 if (nextDayCheckInterval) {
                     clearInterval(nextDayCheckInterval);
                     nextDayCheckInterval = null;
@@ -288,6 +299,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         removeNextDayCheckbox();
         removeOneItemPerBoxCheckbox();
+        removeNextDayAutoScanCheckbox();
     }
 
     function runCodeIfUrlContains(specificString, callback) {
@@ -437,7 +449,6 @@ window.addEventListener('DOMContentLoaded', () => {
             groupLabel.style.cursor = 'pointer';
             groupLabel.style.verticalAlign = 'middle';
 
-
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = 'status';
@@ -448,10 +459,7 @@ window.addEventListener('DOMContentLoaded', () => {
             checkbox.addEventListener('change', function() {
                 const newState = this.checked;
                 featureStates.featureNextDayAutoStartEnabled = newState;
-                chrome.storage.sync.set({ featureNextDayAutoStartEnabled: newState }, () => {
-                     if (chrome.runtime.lastError) {
-                     }
-                });
+                chrome.storage.sync.set({ featureNextDayAutoStartEnabled: newState }, () => {});
             });
 
             const span = document.createElement('span');
@@ -490,42 +498,31 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         const sscDiv = document.querySelector('.ssc-breadcrumb');
-        if (!sscDiv) {
-            return;
-        }
+        if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_one_item_per_box_focus');
 
         if (!groupLabel) {
             groupLabel = document.createElement('label');
             groupLabel.id = 'group_one_item_per_box_focus';
-            groupLabel.style.marginLeft = '10px';
-            groupLabel.style.display = 'inline-flex';
-            groupLabel.style.alignItems = 'center';
-            groupLabel.style.cursor = 'pointer';
-            groupLabel.style.verticalAlign = 'middle';
+            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = 'oneItemPerBoxFocusCheckbox';
             checkbox.checked = featureStates.featureOneItemPerBoxEnabled;
-            checkbox.style.marginRight = '5px';
-            checkbox.style.verticalAlign = 'middle';
+            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
 
             checkbox.addEventListener('change', function() {
                 const newState = this.checked;
                 featureStates.featureOneItemPerBoxEnabled = newState;
-                chrome.storage.sync.set({ featureOneItemPerBoxEnabled: newState }, () => {
-                    if (chrome.runtime.lastError) {
-                    }
-                });
+                chrome.storage.sync.set({ featureOneItemPerBoxEnabled: newState }, () => {});
             });
 
             const span = document.createElement('span');
             span.id = 'text_one_item_per_box_focus';
             span.textContent = '一件一箱';
-            span.style.fontSize = '13px';
-            span.style.verticalAlign = 'middle';
+            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
 
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
@@ -536,7 +533,6 @@ window.addEventListener('DOMContentLoaded', () => {
             } else {
                 sscDiv.appendChild(groupLabel);
             }
-
         } else {
             const existingCheckbox = groupLabel.querySelector('#oneItemPerBoxFocusCheckbox');
             if (existingCheckbox && existingCheckbox.checked !== featureStates.featureOneItemPerBoxEnabled) {
@@ -547,11 +543,62 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function removeOneItemPerBoxCheckbox() {
         const groupEl = document.getElementById('group_one_item_per_box_focus');
-        if (groupEl) {
-            groupEl.remove();
+        if (groupEl) groupEl.remove();
+    }
+
+    function addOrUpdateNextDayAutoScanCheckbox() {
+        if (!featureStates.masterEnabled) {
+            removeNextDayAutoScanCheckbox();
+            return;
+        }
+        
+        const sscDiv = document.querySelector('.ssc-breadcrumb');
+        if (!sscDiv) return;
+
+        let groupLabel = document.getElementById('group_next_day_auto_scan');
+        if (!groupLabel) {
+            groupLabel = document.createElement('label');
+            groupLabel.id = 'group_next_day_auto_scan';
+            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'nextDayAutoScanCheckbox';
+            checkbox.checked = featureStates.featureNextDayAutoScanEnabled;
+            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
+
+            checkbox.addEventListener('change', function() {
+                const newState = this.checked;
+                featureStates.featureNextDayAutoScanEnabled = newState;
+                chrome.storage.sync.set({ featureNextDayAutoScanEnabled: newState }, () => {});
+            });
+
+            const span = document.createElement('span');
+            span.textContent = '隔日自動刷件';
+            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
+            
+            groupLabel.appendChild(checkbox);
+            groupLabel.appendChild(span);
+
+            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
+            if (lastCheckbox && lastCheckbox.parentNode === sscDiv) {
+                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
+            } else {
+                sscDiv.appendChild(groupLabel);
+            }
+        } else {
+            const existingCheckbox = groupLabel.querySelector('#nextDayAutoScanCheckbox');
+            if (existingCheckbox && existingCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
+                existingCheckbox.checked = featureStates.featureNextDayAutoScanEnabled;
+            }
         }
     }
 
+    function removeNextDayAutoScanCheckbox() {
+        const groupEl = document.getElementById('group_next_day_auto_scan');
+        if (groupEl) groupEl.remove();
+    }
+    
     startNextDayFeature();
 
     function startCheckoutDataProcessingAndTTS() {
@@ -631,8 +678,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const newlyFoundItemsForConsoleLog = {};
 
         if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled) {
-            if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
-            }
+            if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {}
             return;
         }
 
@@ -671,9 +717,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         if (Object.keys(newlyFoundItemsForConsoleLog).length > 0) {
-             if (itemsToSpeakInOrder.length > 0) {
-            } else {
-            }
+             if (itemsToSpeakInOrder.length > 0) {} 
+             else {}
         }
 
         if (itemsToSpeakInOrder.length > 0) {
@@ -699,9 +744,9 @@ window.addEventListener('DOMContentLoaded', () => {
             if (currentIndex < items.length) {
                 let textToSpeak = items[currentIndex];
 
-                if (textToSpeak.startsWith("總金額 ")) {
-                } else if (textToSpeak.startsWith("找 ") && textToSpeak.endsWith(" 元")) {
-                } else if (textToSpeak.startsWith("末三碼 ")) {
+                if (textToSpeak.startsWith("總金額 ")) {} 
+                else if (textToSpeak.startsWith("找 ") && textToSpeak.endsWith(" 元")) {} 
+                else if (textToSpeak.startsWith("末三碼 ")) {
                     const numericPart = textToSpeak.substring(4);
                     if (/^\d{3}$/.test(numericPart)) {
                         textToSpeak = "末三碼 " + numericPart.split('').join(' ');
@@ -769,8 +814,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         operationButton.focus();
                     }
                     checkoutActionPerformed = true;
-                } catch (error) {
-                }
+                } catch (error) {}
             }
         } else {
             stopCheckoutDataProcessingAndTTS();
@@ -825,8 +869,7 @@ window.addEventListener('DOMContentLoaded', () => {
                      const url = chrome.runtime.getURL('libs/pdf.worker.min.js');
                      pdfjsLib.GlobalWorkerOptions.workerSrc = url;
                  }
-                 catch (e) {
-                 }
+                 catch (e) {}
             }
         }
 
@@ -1231,8 +1274,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     ];
                     let fullFound = false;
 
-                    currentRenderState = await getFeatureStatesFromContent();
-                    if (!currentRenderState.masterEnabled || !currentRenderState.featureFileScanEnabled) {
+                    currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                    if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                         addBatchScanError(fileNameForReport, pgNum, 'Render', 'Cancelled', '功能已停用');
                         throw new Error("Op cancelled during render");
                     }
@@ -1276,8 +1319,8 @@ window.addEventListener('DOMContentLoaded', () => {
                         for (let qi = 0; qi < quads.length; qi++) {
                             const q = quads[qi];
                             const isLast = qi === quads.length - 1;
-                            currentRenderState = await getFeatureStatesFromContent();
-                             if (!currentRenderState.masterEnabled || !currentRenderState.featureFileScanEnabled) {
+                            currentRuntimeFeatureStates = await getFeatureStatesFromContent();
+                             if (!currentRuntimeFeatureStates.masterEnabled || !currentRuntimeFeatureStates.featureFileScanEnabled) {
                                 addBatchScanError(fileNameForReport, pgNum, q.n + ' QR', 'Cancelled', '功能已停用');
                                 break;
                             }
