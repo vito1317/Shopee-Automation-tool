@@ -61,7 +61,7 @@
 本工具已上架至 Chrome 線上應用程式商店，可透過以下連結一鍵安裝：
 
 <a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig" target="_blank">
-  <img src="https://lh3.googleusercontent.com/5nb0TzTwKJranRsJY-Y1VCSO8yrAefLLSLsI0fybgqWCYZo4KeTYK4tF4jovxHIuRLZPGYvHmJcL_SE6AHOetUENjA=s120" alt="前往 Chrome 線上應用程式商店" width="200">
+  <img src="https://cdn-icons-png.flaticon.com/512/0/532.png" alt="前往 Chrome 線上應用程式商店" width="200">
 </a>
 
 1.  點擊上方按鈕前往商店頁面。
