@@ -2,7 +2,18 @@
 
 # 蝦皮自動化工具 v4.20.1
 
-![版本](https://img.shields.io/badge/版本-4.20.1-blue.svg)![平台](https://img.shields.io/badge/平台-Chrome-orange.svg)![狀態](https://img.shields.io/badge/狀態-內部使用-green.svg)
+<p>
+  <a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig">
+    <img src="https://img.shields.io/chrome-web-store/v/gjlkkpgkdecjgcnekbgbcidokfcnciig.svg" alt="Chrome Web Store Version">
+  </a>
+  <a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig">
+    <img src="https://img.shields.io/chrome-web-store/stars/gjlkkpgkdecjgcnekbgbcidokfcnciig.svg" alt="Chrome Web Store Stars">
+  </a>
+  <a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig">
+    <img src="https://img.shields.io/chrome-web-store/users/gjlkkpgkdecjgcnekbgbcidokfcnciig.svg" alt="Chrome Web Store Users">
+  </a>
+  <img src="https://img.shields.io/badge/狀態-內部使用-green.svg" alt="狀態">
+</p>
 
 這是一個非官方的 Chrome 瀏覽器擴充功能，旨在自動化蝦皮內部物流平台 (`sp.spx.shopee.tw`) 的部分重複性操作，以提升工作效率。
 
@@ -47,18 +58,19 @@
 
 ## ⚙️ 安裝指南
 
-由於是內部工具，無法上架至 Chrome 線上應用程式商店，請依照以下步驟手動安裝：
+本工具已上架至 Chrome 線上應用程式商店，可透過以下連結一鍵安裝：
 
-1.  下載本專案的所有檔案，並解壓縮至一個固定的資料夾（例如 `C:\ShopeeTool`）。
-2.  打開 Chrome 瀏覽器，在網址列輸入 `chrome://extensions` 並按下 Enter。
-3.  在頁面的右上角，打開 **「開發人員模式」** 的開關。
-4.  點擊左上角的 **「載入未封裝項目」** 按鈕。
-5.  在彈出的視窗中，選擇您在步驟 1 中解壓縮的資料夾。
-6.  安裝成功後，您會在擴充功能列表中看到「蝦皮自動化工具」，並在瀏覽器右上角看到其圖示。
+<a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig" target="_blank">
+  <img src="https://storage.googleapis.com/web-dev-uploads/image/WlD8wC6g8khYWPJUsQceQkhXSlv1/HRs9MPufa1J1h5glNhut.png" alt="前往 Chrome 線上應用程式商店" width="200">
+</a>
+
+1.  點擊上方按鈕前往商店頁面。
+2.  點擊頁面中的「**新增至 Chrome**」按鈕。
+3.  安裝成功後，建議在瀏覽器右上角的擴充功能選單中將「**蝦皮自動化工具**」釘選，方便快速取用。
 
 ## 🚀 使用說明
 
-1.  點擊瀏覽器右上角的擴充功能圖示，即可打開設定選單。
+1.  點擊瀏覽器右上角已釘選的擴充功能圖示，即可打開設定選單。
 2.  **總開關**：最上方的「啟用所有功能」是一個總開關，可以一鍵啟用或禁用下方所有功能。
 3.  **獨立開關**：每個功能都有獨立的開關，可以根據您的需求自由組合。
 4.  **子選項**：部分功能（如自動叫號、TTS）有可展開的子選項，提供更細緻的設定。
