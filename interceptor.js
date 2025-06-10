@@ -13,7 +13,6 @@
     };
     
     let isExpectingInvalidOrderMessage = false;
-    let isExpectingSuccessMessage = false;
 
     document.addEventListener('extension-settings-loaded', (event) => {
         if (event.detail) {
@@ -29,7 +28,7 @@
     const INVALID_ORDER_RETCODE = 1501010;
     const SUCCESS_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/success-alert.c7545e0a.mp3';
     const FAILURE_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/failure-alert.3a69fd73.mp3';
-    const RETRY_DELAY_MS = 100;
+    const RETRY_DELAY_MS = 200;
 
     const retryingShipmentIds = new Set();
     let messageTimeoutId = null;
@@ -41,24 +40,31 @@
         return new originalAudio(url);
     };
 
-    function modifyMessage(targetBox, text, iconType) {
-        if (!targetBox) return;
+    function showCustomMessage(text, iconType) {
+        let existingBox = document.getElementById('extension-custom-message');
+        if(existingBox) existingBox.remove();
         if (messageTimeoutId) clearTimeout(messageTimeoutId);
 
+        const messageBox = document.createElement('div');
+        messageBox.id = 'extension-custom-message';
+        
         const successIcon = `<svg viewBox="0 0 16 16" fill="#52c41a" width="24" class="ssc-message-icon" style="margin-right: 8px;"><path fill-rule="evenodd" d="M8 1a7 7 0 110 14A7 7 0 018 1zm3.15 4.93L7.1 9.98 4.85 7.73a.5.5 0 10-.7.71l2.6 2.6c.19.2.5.2.7 0l4.4-4.4a.5.5 0 00-.7-.71z"></path></svg>`;
         const errorIcon = `<svg viewBox="0 0 16 16" fill="#f5222d" width="24" class="ssc-message-icon" style="margin-right: 8px;"><path fill-rule="evenodd" d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 6.3L5.88 5.16a.5.5 0 00-.77.64l.06.07L7.3 8l-2.12 2.12a.5.5 0 00.64.77l.07-.06L8 8.7l2.12 2.12a.5.5 0 00.77-.64l-.06-.07L8.7 8l2.12-2.12a.5.5 0 00-.64-.77l-.07.06L8 7.3 5.88 5.17 8 7.3z"></path></svg>`;
         
-        targetBox.style.display = 'flex';
-        targetBox.innerHTML = `
+        messageBox.style.cssText = `top: 64px; position: fixed; z-index: 99999; left: 50%; transform: translateX(-50%); display: flex; align-items: center; padding: 8px 16px; background: #fff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); pointer-events: none; transition: opacity 0.3s, top 0.3s; opacity: 1;`;
+        messageBox.innerHTML = `
             ${iconType === 'success' ? successIcon : errorIcon}
             <p class="ssc-message-content" style="font-size: 14px; margin: 0; color: #333;">${text}</p>
         `;
-
+        document.body.appendChild(messageBox);
+        
         messageTimeoutId = setTimeout(() => {
-            if (targetBox) {
-                targetBox.style.display = 'none';
+            if (messageBox) {
+                 messageBox.style.opacity = '0';
+                 messageBox.style.top = '44px';
+                 setTimeout(() => messageBox.remove(), 300);
             }
-        }, 1500);
+        }, 2000);
     }
     
     function playSound(url) {
@@ -68,20 +74,14 @@
     }
 
     const observer = new MutationObserver((mutationsList) => {
+        if (!isExpectingInvalidOrderMessage) return;
         for (const mutation of mutationsList) {
             for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message')) {
-                    if (isExpectingInvalidOrderMessage && node.textContent == '無效訂單') {
-                        isExpectingInvalidOrderMessage = false;
-                        modifyMessage(node, "正在嘗試刷件", 'success');
-                        return;
-                    }
-                    if (isExpectingSuccessMessage && node.textContent.includes('成功')) {
-                        isExpectingSuccessMessage = false;
-                        modifyMessage(node, "已成功自動刷件，並裝箱", 'success');
-                        playSound(SUCCESS_SOUND_URL);
-                        return;
-                    }
+                if (node.nodeType === 1 && node.classList && node.classList.contains('ssc-message') && node.textContent.includes('無效訂單')) {
+                    node.style.display = 'none'; 
+                    showCustomMessage("正在嘗試刷件", 'success');
+                    isExpectingInvalidOrderMessage = false; 
+                    return;
                 }
             }
         }
@@ -130,12 +130,9 @@
         try {
             const requestBody = JSON.parse(originalBody);
             shipmentId = requestBody.shipment_id;
-
-            if (!shipmentId || retryingShipmentIds.has(shipmentId)) {
-                return { success: false };
-            }
-            retryingShipmentIds.add(shipmentId);
+            if (!shipmentId || retryingShipmentIds.has(shipmentId)) return { success: false };
             
+            retryingShipmentIds.add(shipmentId);
             const receiveTaskId = await fetchValidDrtId();
             if (!receiveTaskId) return { success: false };
             
@@ -163,7 +160,7 @@
 
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
 
-            const originalUrl = 'https://sp.spx.shopee.tw' + TARGET_URL_PART;
+            const originalUrl = 'https://sp.spx.shopee.tw' + ADD_ORDER_URL_PART;
             const retryResponse = await originalFetch(originalUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -175,12 +172,12 @@
                 const retryResponseData = JSON.parse(retryResponseText);
                 
                 if (retryResponseData.retcode === INVALID_ORDER_RETCODE) {
-                    const messageBox = Array.from(document.querySelectorAll('.ssc-message')).find(m => m.textContent.includes('正在嘗試刷件'));
-                    modifyMessage(messageBox, "無效訂單", 'error');
+                    showCustomMessage("無效訂單", 'error');
                     playSound(FAILURE_SOUND_URL);
                     return { success: false }; 
                 } else {
-                    isExpectingSuccessMessage = true;
+                    showCustomMessage("已成功自動刷件，並裝箱", 'success');
+                    playSound(SUCCESS_SOUND_URL);
                     return { success: true, responseText: retryResponseText };
                 }
             }
@@ -201,6 +198,8 @@
 
             if (!toNumbers || toNumbers.length === 0) return;
 
+            showCustomMessage("列印成功，並自動刷取", 'success');
+            
             for (const to_number of toNumbers) {
                 await originalFetch(SCAN_TO_URL, {
                     method: 'POST',
@@ -208,6 +207,7 @@
                     body: JSON.stringify({ to_number })
                 });
             }
+            playSound(SUCCESS_SOUND_URL);
         } catch (e) {}
     }
 
@@ -219,8 +219,9 @@
 
     XMLHttpRequest.prototype.send = async function(body) {
         const localStates = await getFeatureStateAsync();
+        if (!localStates.masterEnabled) return originalXhrSend.apply(this, arguments);
 
-        if (localStates.masterEnabled && this._requestUrl && this._requestMethod.toUpperCase() === 'POST') {
+        if (this._requestUrl && this._requestMethod.toUpperCase() === 'POST') {
             
             if (localStates.featureNextDayAutoScanEnabled && this._requestUrl.includes(ADD_ORDER_URL_PART)) {
                 const originalXhr = this;
@@ -241,7 +242,7 @@
                         } catch (e) {}
                     }
                     if (originalOnReadyStateChange) {
-                        return originalOnReadyStateChange.apply(originalXhr, arguments);
+                        originalOnReadyStateChange.apply(originalXhr, arguments);
                     }
                 };
             }

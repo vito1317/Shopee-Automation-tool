@@ -79,14 +79,14 @@ window.addEventListener('DOMContentLoaded', () => {
              }
         }
 
-        if (featureStates.hasOwnProperty('featureNextDayEnabled') || featureStates.hasOwnProperty('featureNextDayAutoScanEnabled')) {
+        if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
             if (!featureStates.masterEnabled) {
                 stopNextDayFeature();
             } else {
                 startNextDayFeature();
             }
         }
-
+        
         if (featureStates.hasOwnProperty('featureNextDayAutoStartEnabled')) {
             const nextDayCheckbox = document.getElementById('status');
             if (nextDayCheckbox && nextDayCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) {
@@ -267,12 +267,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     removeNextDayCheckbox();
                     removeOneItemPerBoxCheckbox();
                 }
-                
-                if (featureStates.featureNextDayAutoScanEnabled) {
-                    addOrUpdateNextDayAutoScanCheckbox();
-                } else {
-                    removeNextDayAutoScanCheckbox();
-                }
+                addOrUpdateNextDayAutoScanCheckbox();
             } else {
                 removeNextDayCheckbox();
                 removeOneItemPerBoxCheckbox();
@@ -584,10 +579,10 @@ window.addEventListener('DOMContentLoaded', () => {
             
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-            
-            const referenceNode = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
-            if (referenceNode && referenceNode.parentNode === sscDiv) {
-                referenceNode.insertAdjacentElement('afterend', groupLabel);
+
+            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
+            if (lastCheckbox && lastCheckbox.parentNode === sscDiv) {
+                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
             } else {
                 sscDiv.appendChild(groupLabel);
             }
