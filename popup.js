@@ -20,9 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         nextDayAutoScan: { el: document.getElementById('featureNextDayAutoScanSwitch'), key: 'featureNextDayAutoScanEnabled', textEl: document.getElementById('featureNextDayAutoScanStatusText'), default: true, label: '隔日自動刷件' },
         
+        toAutoScan: { el: document.getElementById('featureToAutoScanSwitch'), key: 'featureToAutoScanEnabled', textEl: document.getElementById('featureToAutoScanStatusText'), default: true, label: 'TO單自動刷取' },
+
         fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
     };
-
 
     function updateStatusText(switchConfig, isEnabled, parentIsEnabled = true) {
         if (!switchConfig?.textEl || !document.body.contains(switchConfig.textEl)) {
@@ -72,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
         childConfig.el.disabled = !parentIsEnabled;
         updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
     }
-
 
     function loadAllStates() {
         const keysToGet = {};

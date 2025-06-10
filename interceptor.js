@@ -8,7 +8,8 @@
 
     let featureStates = {
         masterEnabled: false,
-        featureNextDayAutoScanEnabled: false
+        featureNextDayAutoScanEnabled: false,
+        featureToAutoScanEnabled: false 
     };
     
     let isExpectingInvalidOrderMessage = false;
@@ -21,11 +22,14 @@
         }
     });
 
-    const TARGET_URL_PART = '/sp-api/point/sorting/transport/order/add';
+    const ADD_ORDER_URL_PART = '/sp-api/point/sorting/transport/order/add';
+    const PRINT_TO_URL_PART = '/sp-api/point/sorting/box_to/transport_group/print';
+    const SCAN_TO_URL = 'https://sp.spx.shopee.tw/sp-api/point/sorting/box_to/transport/scan';
+
     const INVALID_ORDER_RETCODE = 1501010;
     const SUCCESS_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/success-alert.c7545e0a.mp3';
     const FAILURE_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/failure-alert.3a69fd73.mp3';
-    const RETRY_DELAY_MS = 1;
+    const RETRY_DELAY_MS = 100;
 
     const retryingShipmentIds = new Set();
     let messageTimeoutId = null;
@@ -190,6 +194,23 @@
         }
     }
 
+    async function performToAutoScan(responseBody) {
+        try {
+            const data = JSON.parse(responseBody);
+            const toNumbers = data?.data?.success_list?.map(item => item.to_number).filter(Boolean);
+
+            if (!toNumbers || toNumbers.length === 0) return;
+
+            for (const to_number of toNumbers) {
+                await originalFetch(SCAN_TO_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to_number })
+                });
+            }
+        } catch (e) {}
+    }
+
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
         this._requestMethod = method;
         this._requestUrl = url;
@@ -198,30 +219,44 @@
 
     XMLHttpRequest.prototype.send = async function(body) {
         const localStates = await getFeatureStateAsync();
-        const isEnabled = localStates.masterEnabled && localStates.featureNextDayAutoScanEnabled;
 
-        if (isEnabled && this._requestUrl && this._requestUrl.includes(TARGET_URL_PART) && this._requestMethod.toUpperCase() === 'POST') {
-            const originalXhr = this;
-            const originalOnReadyStateChange = this.onreadystatechange;
-            this.onreadystatechange = async function() {
-                if (originalXhr.readyState === 4) {
-                    try {
-                        const responseData = JSON.parse(originalXhr.responseText);
-                        if (responseData.retcode === INVALID_ORDER_RETCODE) {
-                            isExpectingInvalidOrderMessage = true;
-                            const retryResult = await performFixAndRetry(body);
-                            if (retryResult.success) {
-                                Object.defineProperty(originalXhr, 'responseText', { value: retryResult.responseText, writable: true });
-                                Object.defineProperty(originalXhr, 'status', { value: 200, writable: true });
-                                Object.defineProperty(originalXhr, 'statusText', { value: 'OK', writable: true });
+        if (localStates.masterEnabled && this._requestUrl && this._requestMethod.toUpperCase() === 'POST') {
+            
+            if (localStates.featureNextDayAutoScanEnabled && this._requestUrl.includes(ADD_ORDER_URL_PART)) {
+                const originalXhr = this;
+                const originalOnReadyStateChange = this.onreadystatechange;
+                this.onreadystatechange = async function() {
+                    if (originalXhr.readyState === 4) {
+                        try {
+                            const responseData = JSON.parse(originalXhr.responseText);
+                            if (responseData.retcode === INVALID_ORDER_RETCODE) {
+                                isExpectingInvalidOrderMessage = true;
+                                const retryResult = await performFixAndRetry(body);
+                                if (retryResult.success) {
+                                    Object.defineProperty(originalXhr, 'responseText', { value: retryResult.responseText, writable: true });
+                                    Object.defineProperty(originalXhr, 'status', { value: 200, writable: true });
+                                    Object.defineProperty(originalXhr, 'statusText', { value: 'OK', writable: true });
+                                }
                             }
-                        }
-                    } catch (e) {}
-                }
-                if (originalOnReadyStateChange) {
-                    return originalOnReadyStateChange.apply(originalXhr, arguments);
-                }
-            };
+                        } catch (e) {}
+                    }
+                    if (originalOnReadyStateChange) {
+                        return originalOnReadyStateChange.apply(originalXhr, arguments);
+                    }
+                };
+            }
+            
+            if (localStates.featureToAutoScanEnabled && this._requestUrl.includes(PRINT_TO_URL_PART)) {
+                const originalOnLoad = this.onload;
+                this.onload = function(event) {
+                    if (this.status === 200) {
+                        performToAutoScan(this.responseText);
+                    }
+                    if (originalOnLoad) {
+                        originalOnLoad.apply(this, arguments);
+                    }
+                };
+            }
         }
         return originalXhrSend.apply(this, arguments);
     };
@@ -229,31 +264,39 @@
     window.fetch = async function(...args) {
         const [urlOrRequest, config] = args;
         const localStates = await getFeatureStateAsync();
-        const isEnabled = localStates.masterEnabled && localStates.featureNextDayAutoScanEnabled;
+        const isEnabled = localStates.masterEnabled;
         const url = (typeof urlOrRequest === 'string') ? urlOrRequest : urlOrRequest.url;
         const method = (config?.method || urlOrRequest?.method)?.toUpperCase();
 
-        if (isEnabled && url.includes(TARGET_URL_PART) && method === 'POST') {
-            try {
-                const request = new Request(urlOrRequest, config);
-                const requestClone = request.clone();
-                const response = await originalFetch(request);
-                const responseClone = response.clone();
-                const responseData = await responseClone.json();
-                if (responseData.retcode === INVALID_ORDER_RETCODE) {
-                    isExpectingInvalidOrderMessage = true;
-                    const retryResult = await performFixAndRetry(await requestClone.text());
-                    if (retryResult.success) {
-                        return new Response(retryResult.responseText, {
-                            status: 200,
-                            statusText: 'OK',
-                            headers: response.headers
-                        });
+        if (isEnabled && method === 'POST') {
+            if (localStates.featureNextDayAutoScanEnabled && url.includes(ADD_ORDER_URL_PART)) {
+                try {
+                    const request = new Request(urlOrRequest, config);
+                    const requestClone = request.clone();
+                    const response = await originalFetch(request);
+                    const responseClone = response.clone();
+                    const responseData = await responseClone.json();
+                    if (responseData.retcode === INVALID_ORDER_RETCODE) {
+                        isExpectingInvalidOrderMessage = true;
+                        const retryResult = await performFixAndRetry(await requestClone.text());
+                        if (retryResult.success) {
+                            return new Response(retryResult.responseText, { status: 200, statusText: 'OK', headers: response.headers });
+                        }
                     }
+                    return response;
+                } catch (error) {
+                    return originalFetch(urlOrRequest, config);
+                }
+            }
+            
+            if (localStates.featureToAutoScanEnabled && url.includes(PRINT_TO_URL_PART)) {
+                const response = await originalFetch(urlOrRequest, config);
+                if (response.ok) {
+                    const clonedResponse = response.clone();
+                    const responseBody = await clonedResponse.text();
+                    performToAutoScan(responseBody);
                 }
                 return response;
-            } catch (error) {
-                return originalFetch(urlOrRequest, config);
             }
         }
         return originalFetch(...args);

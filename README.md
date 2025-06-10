@@ -1,5 +1,3 @@
----
-
 # 蝦皮自動化工具 v4.20.1
 
 <p>
@@ -72,7 +70,7 @@
 
 ## ⚙️ 手動安裝指南
 
-1.  下載本專案的所有檔案，並解壓縮至一個固定的資料夾（例如 `C:\Shopee-Automation-tool-master`）。More actions
+1.  下載本專案的所有檔案，並解壓縮至一個固定的資料夾（例如 `C:\Shopee-Automation-tool-master`）。
 2.  打開 Chrome 瀏覽器，在網址列輸入 `chrome://extensions` 並按下 Enter。
 3.  在頁面的右上角，打開 **「開發人員模式」** 的開關。
 4.  點擊左上角的 **「載入未封裝項目」** 按鈕。

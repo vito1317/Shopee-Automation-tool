@@ -22,14 +22,16 @@ window.addEventListener('DOMContentLoaded', () => {
         featureTTSEnabled: true,
         featureTTSLocationEnabled: true,
         featureTTSAmountEnabled: true,
-        featureNextDayAutoScanEnabled: true
+        featureNextDayAutoScanEnabled: true,
+        featureToAutoScanEnabled: true
     };
 
     function syncFeatureStatesToInterceptor(states) {
         const event = new CustomEvent('extension-settings-loaded', {
             detail: {
                 masterEnabled: states.masterEnabled,
-                featureNextDayAutoScanEnabled: states.featureNextDayAutoScanEnabled
+                featureNextDayAutoScanEnabled: states.featureNextDayAutoScanEnabled,
+                featureToAutoScanEnabled: states.featureToAutoScanEnabled
             }
         });
         document.documentElement.dataset.extensionFeatures = JSON.stringify(event.detail);
@@ -68,7 +70,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
     function handleFeatureStateChange(isInitialLoad = false) {
         if (featureStates.hasOwnProperty('featureFileScanEnabled')) {
              if (!featureStates.masterEnabled || !featureStates.featureFileScanEnabled) {
@@ -78,25 +79,28 @@ window.addEventListener('DOMContentLoaded', () => {
              }
         }
 
-        if (featureStates.hasOwnProperty('featureNextDayEnabled')) {
+        if (featureStates.hasOwnProperty('featureNextDayEnabled') || featureStates.hasOwnProperty('featureNextDayAutoScanEnabled')) {
             if (!featureStates.masterEnabled) {
                 stopNextDayFeature();
             } else {
                 startNextDayFeature();
             }
         }
+
         if (featureStates.hasOwnProperty('featureNextDayAutoStartEnabled')) {
             const nextDayCheckbox = document.getElementById('status');
             if (nextDayCheckbox && nextDayCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) {
                 nextDayCheckbox.checked = featureStates.featureNextDayAutoStartEnabled;
             }
         }
+
         if (featureStates.hasOwnProperty('featureOneItemPerBoxEnabled')) {
             const oneItemPerBoxCheckbox = document.getElementById('oneItemPerBoxFocusCheckbox');
             if (oneItemPerBoxCheckbox && oneItemPerBoxCheckbox.checked !== featureStates.featureOneItemPerBoxEnabled) {
                 oneItemPerBoxCheckbox.checked = featureStates.featureOneItemPerBoxEnabled;
             }
         }
+        
         if (featureStates.hasOwnProperty('featureNextDayAutoScanEnabled')) {
             const nextDayAutoScanCheckbox = document.getElementById('nextDayAutoScanCheckbox');
             if (nextDayAutoScanCheckbox && nextDayAutoScanCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
@@ -112,7 +116,6 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
-
 
     let currentUrl = window.location.href;
     let checkoutActionPerformed = false;
@@ -130,7 +133,6 @@ window.addEventListener('DOMContentLoaded', () => {
             stopCheckoutDataProcessingAndTTS();
             startCheckoutDataProcessingAndTTS();
         }
-
 
         let needsCheckoutActionReset = false;
         if (isInitialLoad) {
@@ -161,7 +163,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         autoCheckout();
     }, 750);
-
 
     let currentUrl_BoxScan = window.location.href;
     const intervalId_BoxScan = setInterval(function() {
@@ -200,7 +201,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     urlChangedFunction_BoxScan();
     setInterval(()=>{urlChangedFunction_BoxScan()},1000);
-
 
     let autoCallNumberIntervalId = null;
 
@@ -267,7 +267,12 @@ window.addEventListener('DOMContentLoaded', () => {
                     removeNextDayCheckbox();
                     removeOneItemPerBoxCheckbox();
                 }
-                addOrUpdateNextDayAutoScanCheckbox();
+                
+                if (featureStates.featureNextDayAutoScanEnabled) {
+                    addOrUpdateNextDayAutoScanCheckbox();
+                } else {
+                    removeNextDayAutoScanCheckbox();
+                }
             } else {
                 removeNextDayCheckbox();
                 removeOneItemPerBoxCheckbox();
@@ -552,7 +557,7 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
+        const sscDiv = document.querySelector('.ssc-breadcrumb');
         if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_next_day_auto_scan');
@@ -579,10 +584,10 @@ window.addEventListener('DOMContentLoaded', () => {
             
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-
-            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
-            if (lastCheckbox && lastCheckbox.parentNode === sscDiv) {
-                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
+            
+            const referenceNode = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
+            if (referenceNode && referenceNode.parentNode === sscDiv) {
+                referenceNode.insertAdjacentElement('afterend', groupLabel);
             } else {
                 sscDiv.appendChild(groupLabel);
             }
