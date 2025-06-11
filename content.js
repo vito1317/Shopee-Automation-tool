@@ -482,7 +482,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function addOrUpdateNextDayAutoScanCheckbox() {
-        const sscDiv = document.querySelector('.ssc-breadcrumb');
+        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
         if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_next_day_auto_scan');
@@ -529,7 +529,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     
     function addOrUpdateToAutoScanCheckbox() {
-        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
+        const sscDiv = document.querySelector('.ssc-breadcrumb');
         if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_to_auto_scan');
