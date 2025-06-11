@@ -384,7 +384,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 const secoundDivElement = divElements[2];
                 const inputElement = secoundDivElement.querySelector('input');
                 if (inputElement && document.activeElement !== inputElement) {
-                    inputElement.focus();
+                    const btnDistance = document.querySelector('.ssc-button.btn-distance');
+                    if (btnDistance) btnDistance.click();
                 }
             }
         }
