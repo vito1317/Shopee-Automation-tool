@@ -185,7 +185,7 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (currentUrl_BoxScan === 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to/scan-to') {
+        if (currentUrl_BoxScan === 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to/scan-to-new') {
             setTimeout(() => {
                 const divElement = document.querySelectorAll('.ssc-input-shape-default');
                 if (divElement.length >= 2) {
@@ -319,7 +319,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (toAutoScanIntervalId) return;
 
         toAutoScanIntervalId = setInterval(() => {
-            const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to/';
+            const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to';
             if (window.location.href.includes(targetUrl)) {
                 addOrUpdateToAutoScanCheckbox();
             } else {
@@ -423,9 +423,20 @@ window.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const ssc_messages = document.querySelectorAll('.ssc-message');
+            let successMessageFound = false;
+            const messages = document.querySelectorAll('.ssc-message');
+            for (const msg of messages) {
+                const isSuccess = msg.querySelector('.ssc-message-icon.ssc-message-success');
+                const hasSuccessText = msg.textContent.includes('列印成功');
+                const isVisible = msg.offsetParent !== null;
 
-            if (ssc_messages.length >= 2) {
+                if (isSuccess && hasSuccessText && isVisible) {
+                    successMessageFound = true;
+                    break;
+                }
+            }
+
+            if (successMessageFound) {
                 clearInterval(nextDayCheckInterval);
                 nextDayCheckInterval = null;
 
@@ -574,7 +585,7 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
+        const sscDiv = document.querySelector('.ssc-breadcrumb');
         if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_next_day_auto_scan');
