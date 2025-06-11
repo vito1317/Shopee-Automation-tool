@@ -108,6 +108,13 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        if (featureStates.hasOwnProperty('featureToAutoScanEnabled')) {
+            const toAutoScanCheckbox = document.getElementById('toAutoScanCheckbox');
+            if (toAutoScanCheckbox && toAutoScanCheckbox.checked !== featureStates.featureToAutoScanEnabled) {
+                toAutoScanCheckbox.checked = featureStates.featureToAutoScanEnabled;
+            }
+        }
+
         if (featureStates.hasOwnProperty('featureQueueingEnabled')) {
             if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
                 stopAutoCallNumberFeature();
@@ -301,6 +308,25 @@ window.addEventListener('DOMContentLoaded', () => {
         removeOneItemPerBoxCheckbox();
         removeNextDayAutoScanCheckbox();
     }
+    
+    let toAutoScanIntervalId = null;
+
+    function startToAutoScanFeature() {
+        if (!featureStates.masterEnabled) {
+            removeToAutoScanCheckbox();
+            return;
+        }
+        if (toAutoScanIntervalId) return;
+
+        toAutoScanIntervalId = setInterval(() => {
+            const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to/';
+            if (window.location.href.includes(targetUrl)) {
+                addOrUpdateToAutoScanCheckbox();
+            } else {
+                removeToAutoScanCheckbox();
+            }
+        }, 1000);
+    }
 
     function runCodeIfUrlContains(specificString, callback) {
         const currentUrl = window.location.href;
@@ -434,9 +460,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         const sscDiv = document.querySelector('.ssc-breadcrumb');
-        if (!sscDiv) {
-            return;
-        }
+        if (!sscDiv) return;
 
         let groupLabel = document.getElementById('group_nextday_auto_start');
 
@@ -482,9 +506,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function removeNextDayCheckbox() {
         const groupEl = document.getElementById('group_nextday_auto_start');
-        if (groupEl) {
-            groupEl.remove();
-        }
+        if (groupEl) groupEl.remove();
         if (nextDayCheckInterval) {
             clearInterval(nextDayCheckInterval);
             nextDayCheckInterval = null;
@@ -580,7 +602,7 @@ window.addEventListener('DOMContentLoaded', () => {
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
 
-            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start');
+            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
             if (lastCheckbox && lastCheckbox.parentNode === sscDiv) {
                 lastCheckbox.insertAdjacentElement('afterend', groupLabel);
             } else {
@@ -599,7 +621,55 @@ window.addEventListener('DOMContentLoaded', () => {
         if (groupEl) groupEl.remove();
     }
     
+    function addOrUpdateToAutoScanCheckbox() {
+        if (!featureStates.masterEnabled || !featureStates.featureToAutoScanEnabled) {
+            removeToAutoScanCheckbox();
+            return;
+        }
+
+        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
+        if (!sscDiv) return;
+
+        let groupLabel = document.getElementById('group_to_auto_scan');
+        if (!groupLabel) {
+            groupLabel = document.createElement('label');
+            groupLabel.id = 'group_to_auto_scan';
+            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'toAutoScanCheckbox';
+            checkbox.checked = featureStates.featureToAutoScanEnabled;
+            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
+
+            checkbox.addEventListener('change', function() {
+                const newState = this.checked;
+                featureStates.featureToAutoScanEnabled = newState;
+                chrome.storage.sync.set({ featureToAutoScanEnabled: newState }, () => {});
+            });
+
+            const span = document.createElement('span');
+            span.textContent = 'TO單自動刷取';
+            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
+
+            groupLabel.appendChild(checkbox);
+            groupLabel.appendChild(span);
+            sscDiv.appendChild(groupLabel);
+        } else {
+            const existingCheckbox = groupLabel.querySelector('#toAutoScanCheckbox');
+            if (existingCheckbox && existingCheckbox.checked !== featureStates.featureToAutoScanEnabled) {
+                existingCheckbox.checked = featureStates.featureToAutoScanEnabled;
+            }
+        }
+    }
+
+    function removeToAutoScanCheckbox() {
+        const groupEl = document.getElementById('group_to_auto_scan');
+        if (groupEl) groupEl.remove();
+    }
+    
     startNextDayFeature();
+    startToAutoScanFeature();
 
     function startCheckoutDataProcessingAndTTS() {
         if (checkoutDataProcessingIntervalId === null) {

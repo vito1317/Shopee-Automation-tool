@@ -17,13 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
         nextDay: { el: document.getElementById('featureNextDaySwitch'), key: 'featureNextDayEnabled', textEl: document.getElementById('featureNextDayStatusText'), default: true, label: '自動完成隔日' },
         nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureNextDayAutoStartContainer') },
         oneItemPerBox: { el: document.getElementById('featureOneItemPerBoxSwitch'), key: 'featureOneItemPerBoxEnabled', textEl: document.getElementById('featureOneItemPerBoxStatusText'), default: true, label: '↳ 一件一箱自動裝箱', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureOneItemPerBoxContainer') },
-
+        
         nextDayAutoScan: { el: document.getElementById('featureNextDayAutoScanSwitch'), key: 'featureNextDayAutoScanEnabled', textEl: document.getElementById('featureNextDayAutoScanStatusText'), default: true, label: '隔日自動刷件' },
         
         toAutoScan: { el: document.getElementById('featureToAutoScanSwitch'), key: 'featureToAutoScanEnabled', textEl: document.getElementById('featureToAutoScanStatusText'), default: true, label: 'TO單自動刷取' },
-        
+
         fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
     };
+
 
     function updateStatusText(switchConfig, isEnabled, parentIsEnabled = true) {
         if (!switchConfig?.textEl || !document.body.contains(switchConfig.textEl)) {
@@ -73,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         childConfig.el.disabled = !parentIsEnabled;
         updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
     }
+
 
     function loadAllStates() {
         const keysToGet = {};
