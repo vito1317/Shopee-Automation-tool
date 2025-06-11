@@ -508,13 +508,7 @@ window.addEventListener('DOMContentLoaded', () => {
             
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-
-            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
-            if (lastCheckbox) {
-                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
-            } else {
-                sscDiv.appendChild(groupLabel);
-            }
+            sscDiv.appendChild(groupLabel);
         } else {
             const existingCheckbox = groupLabel.querySelector('#nextDayAutoScanCheckbox');
             if (existingCheckbox && existingCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
