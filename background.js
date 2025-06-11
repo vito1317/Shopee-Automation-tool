@@ -10,7 +10,8 @@ const FEATURE_KEYS = [
     'featureTTSEnabled',
     'featureTTSLocationEnabled',
     'featureTTSAmountEnabled',
-    'featureNextDayAutoScanEnabled'
+    'featureNextDayAutoScanEnabled',
+    'featureToAutoScanEnabled'
 ];
 
 const ALARM_NAME = 'disableFeaturesAtMidnight';
