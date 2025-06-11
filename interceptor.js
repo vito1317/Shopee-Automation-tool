@@ -41,28 +41,36 @@
     };
 
     function showCustomMessage(text, iconType) {
-        let existingBox = document.getElementById('extension-custom-message');
-        if(existingBox) existingBox.remove();
         if (messageTimeoutId) clearTimeout(messageTimeoutId);
 
-        const messageBox = document.createElement('div');
-        messageBox.id = 'extension-custom-message';
+        let messageBox = document.querySelector('.ssc-message:not([style*="display: none"])');
+        
+        if (!messageBox) {
+            messageBox = document.createElement('div');
+            messageBox.id = 'extension-custom-message';
+            document.body.appendChild(messageBox);
+        }
         
         const successIcon = `<svg viewBox="0 0 16 16" fill="#52c41a" width="24" class="ssc-message-icon" style="margin-right: 8px;"><path fill-rule="evenodd" d="M8 1a7 7 0 110 14A7 7 0 018 1zm3.15 4.93L7.1 9.98 4.85 7.73a.5.5 0 10-.7.71l2.6 2.6c.19.2.5.2.7 0l4.4-4.4a.5.5 0 00-.7-.71z"></path></svg>`;
         const errorIcon = `<svg viewBox="0 0 16 16" fill="#f5222d" width="24" class="ssc-message-icon" style="margin-right: 8px;"><path fill-rule="evenodd" d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 6.3L5.88 5.16a.5.5 0 00-.77.64l.06.07L7.3 8l-2.12 2.12a.5.5 0 00.64.77l.07-.06L8 8.7l2.12 2.12a.5.5 0 00.77-.64l-.06-.07L8.7 8l2.12-2.12a.5.5 0 00-.64-.77l-.07.06L8 7.3 5.88 5.17 8 7.3z"></path></svg>`;
         
-        messageBox.style.cssText = `top: 64px; position: fixed; z-index: 99999; left: 50%; transform: translateX(-50%); display: flex; align-items: center; padding: 8px 16px; background: #fff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); pointer-events: none; transition: opacity 0.3s, top 0.3s; opacity: 1;`;
+        messageBox.className = 'ssc-message';
+        messageBox.style.cssText = `top: 64px; position: fixed; z-index: 99999; left: 50%; transform: translateX(-50%); display: flex; align-items: center; padding: 8px 16px; background: #fff; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15);`;
+        
         messageBox.innerHTML = `
             ${iconType === 'success' ? successIcon : errorIcon}
             <p class="ssc-message-content" style="font-size: 14px; margin: 0; color: #333;">${text}</p>
         `;
-        document.body.appendChild(messageBox);
+        
+        if (iconType === 'success') {
+            playSound(SUCCESS_SOUND_URL);
+        } else if (iconType === 'error') {
+            playSound(FAILURE_SOUND_URL);
+        }
         
         messageTimeoutId = setTimeout(() => {
             if (messageBox) {
-                 messageBox.style.opacity = '0';
-                 messageBox.style.top = '44px';
-                 setTimeout(() => messageBox.remove(), 300);
+                 messageBox.style.display = 'none';
             }
         }, 2000);
     }
@@ -173,11 +181,12 @@
                 
                 if (retryResponseData.retcode === INVALID_ORDER_RETCODE) {
                     showCustomMessage("無效訂單", 'error');
-                    playSound(FAILURE_SOUND_URL);
                     return { success: false }; 
                 } else {
-                    showCustomMessage("已成功自動刷件，並裝箱", 'success');
-                    playSound(SUCCESS_SOUND_URL);
+                    setTimeout(() => {
+                        const successBox = document.querySelector('.ssc-message.ssc-message-success:not([style*="display: none"])');
+                        showCustomMessage(successBox ? "已成功自動刷件，並裝箱" : "已自動刷件", 'success');
+                    }, 50);
                     return { success: true, responseText: retryResponseText };
                 }
             }
@@ -207,7 +216,6 @@
                     body: JSON.stringify({ to_number })
                 });
             }
-            playSound(SUCCESS_SOUND_URL);
         } catch (e) {}
     }
 
