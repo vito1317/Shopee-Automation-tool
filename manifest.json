@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "蝦皮自動化工具",
-    "version": "5.24.1",
+    "version": "5.25.1",
     "description": "整合多種蝦皮自動化功能。功能包誇:自動叫號、自動結帳、自動播報語音(tts)、自動刷取物流單、自動完成隔日、裝箱時自動刷取隔日寄件、自動刷入電子檔、TO單列印時自動刷取。可透過工具列圖示開關。(僅限蝦皮內部使用)",
     "background": {
       "service_worker": "background.js"
