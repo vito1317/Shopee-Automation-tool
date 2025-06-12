@@ -40,8 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.feature-group-toggle').forEach(groupToggle => {
             const group = groupToggle.dataset.group;
             const groupSwitches = Object.values(switches).filter(s => s.group === group);
-            const isAllOn = groupSwitches.every(s => s.el.checked);
-            groupToggle.checked = isAllOn;
+            const isAnyOn = groupSwitches.some(s => s.el.checked);
+            groupToggle.checked = isAnyOn;
         });
     }
 
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const keys = Object.keys(switches);
         chrome.storage.sync.get(keys, (data) => {
             keys.forEach(key => {
-                if (switches[key].el) {
+                if (switches[key] && switches[key].el) {
                     switches[key].el.checked = data[key] ?? true;
                 }
             });
@@ -83,8 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             const changedSwitch = Object.entries(switches).find(([, config]) => config.el === target);
             if (changedSwitch) {
-                const [key, config] = changedSwitch;
-                saveState(key, config.el.checked);
+                const [key] = changedSwitch;
+                saveState(key, target.checked);
             }
         }
         
