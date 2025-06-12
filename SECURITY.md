@@ -25,7 +25,7 @@ I am committed to working with the community to verify and respond to any potent
 
 To report a security vulnerability, please send an email to:
 
-**[請在此處填入您的私人聯絡電子郵件，例如：shopee.automation.tool.security@gmail.com]**
+**[service@vito1317.com]**
 
 Please include the following details in your report:
 
