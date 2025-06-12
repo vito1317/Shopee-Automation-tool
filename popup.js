@@ -1,212 +1,105 @@
 document.addEventListener('DOMContentLoaded', () => {
     const switches = {
-        master: { el: document.getElementById('masterSwitch'), key: 'masterEnabled', textEl: document.getElementById('masterStatusText'), default: true, label: '所有功能' },
-
-        queueing: { el: document.getElementById('featureQueueingSwitch'), key: 'featureQueueingEnabled', textEl: document.getElementById('featureQueueingStatusText'), default: true, label: '自動叫號' },
-        queueingAction: { el: document.getElementById('featureQueueingActionSwitch'), key: 'featureQueueingAction', textEl: document.getElementById('featureQueueingActionStatusText'), default: true, label: '↳ 動作', parentKey: 'queueing', type: 'action', container: document.getElementById('featureQueueingActionContainer') },
-
-        checkout: { el: document.getElementById('featureCheckoutSwitch'), key: 'featureCheckoutEnabled', textEl: document.getElementById('featureCheckoutStatusText'), default: true, label: '自動結帳' },
-        checkoutAction: { el: document.getElementById('featureCheckoutActionSwitch'), key: 'featureCheckoutAction', textEl: document.getElementById('featureCheckoutActionStatusText'), default: true, label: '↳ 動作', parentKey: 'checkout', type: 'action', container: document.getElementById('featureCheckoutActionContainer') },
-        
-        tts: { el: document.getElementById('featureTTSSwitch'), key: 'featureTTSEnabled', textEl: document.getElementById('featureTTSStatusText'), default: true, label: 'TTS 語音播報', container: document.getElementById('featureTTSContainer') },
-        ttsLocation: { el: document.getElementById('featureTTSLocationSwitch'), key: 'featureTTSLocationEnabled', textEl: document.getElementById('featureTTSLocationStatusText'), default: true, label: '↳ 播報櫃位/末三碼', parentKey: 'tts', type: 'sub-option', container: document.getElementById('featureTTSLocationContainer') },
-        ttsAmount: { el: document.getElementById('featureTTSAmountSwitch'), key: 'featureTTSAmountEnabled', textEl: document.getElementById('featureTTSAmountStatusText'), default: true, label: '↳ 播報金額', parentKey: 'tts', type: 'sub-option', container: document.getElementById('featureTTSAmountContainer') },
-
-        boxScan: { el: document.getElementById('featureBoxScanSwitch'), key: 'featureBoxScanEnabled', textEl: document.getElementById('featureBoxScanStatusText'), default: true, label: '自動刷取物流箱單' },
-
-        nextDay: { el: document.getElementById('featureNextDaySwitch'), key: 'featureNextDayEnabled', textEl: document.getElementById('featureNextDayStatusText'), default: true, label: '自動完成隔日' },
-        nextDayAutoStart: { el: document.getElementById('featureNextDayAutoStartSwitch'), key: 'featureNextDayAutoStartEnabled', textEl: document.getElementById('featureNextDayAutoStartStatusText'), default: true, label: '↳ 自動開始下一筆', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureNextDayAutoStartContainer') },
-        oneItemPerBox: { el: document.getElementById('featureOneItemPerBoxSwitch'), key: 'featureOneItemPerBoxEnabled', textEl: document.getElementById('featureOneItemPerBoxStatusText'), default: true, label: '↳ 一件一箱自動裝箱', parentKey: 'nextDay', type: 'sub-option', container: document.getElementById('featureOneItemPerBoxContainer') },
-        
-        nextDayAutoScan: { el: document.getElementById('featureNextDayAutoScanSwitch'), key: 'featureNextDayAutoScanEnabled', textEl: document.getElementById('featureNextDayAutoScanStatusText'), default: true, label: '隔日自動刷件' },
-        
-        toAutoScan: { el: document.getElementById('featureToAutoScanSwitch'), key: 'featureToAutoScanEnabled', textEl: document.getElementById('featureToAutoScanStatusText'), default: true, label: 'TO單自動刷取' },
-
-        fileScan: { el: document.getElementById('featureFileScanSwitch'), key: 'featureFileScanEnabled', textEl: document.getElementById('featureFileScanStatusText'), default: true, label: '自動刷取電子檔' }
+        masterEnabled: { el: document.getElementById('masterSwitch') },
+        featureQueueingEnabled: { el: document.getElementById('featureQueueingSwitch'), group: 'automation' },
+        featureQueueingAction: { el: document.getElementById('featureQueueingActionSwitch'), parent: '#featureQueueingSwitch' },
+        featureCheckoutEnabled: { el: document.getElementById('featureCheckoutSwitch'), group: 'automation' },
+        featureCheckoutAction: { el: document.getElementById('featureCheckoutActionSwitch'), parent: '#featureCheckoutSwitch' },
+        featureTTSEnabled: { el: document.getElementById('featureTTSSwitch'), group: 'assistance' },
+        featureTTSLocationEnabled: { el: document.getElementById('featureTTSLocationSwitch'), parent: '#featureTTSSwitch' },
+        featureTTSAmountEnabled: { el: document.getElementById('featureTTSAmountSwitch'), parent: '#featureTTSSwitch' },
+        featureBoxScanEnabled: { el: document.getElementById('featureBoxScanSwitch'), group: 'packing' },
+        featureNextDayEnabled: { el: document.getElementById('featureNextDaySwitch'), group: 'packing' },
+        featureNextDayAutoStartEnabled: { el: document.getElementById('featureNextDayAutoStartSwitch'), parent: '#featureNextDaySwitch' },
+        featureOneItemPerBoxEnabled: { el: document.getElementById('featureOneItemPerBoxSwitch'), parent: '#featureNextDaySwitch' },
+        featureNextDayAutoScanEnabled: { el: document.getElementById('featureNextDayAutoScanSwitch'), group: 'packing' },
+        featureToAutoScanEnabled: { el: document.getElementById('featureToAutoScanSwitch'), group: 'packing' },
+        featureFileScanEnabled: { el: document.getElementById('featureFileScanSwitch'), group: 'assistance' }
     };
 
+    function saveState(key, value) {
+        chrome.storage.sync.set({ [key]: value });
+    }
 
-    function updateStatusText(switchConfig, isEnabled, parentIsEnabled = true) {
-        if (!switchConfig?.textEl || !document.body.contains(switchConfig.textEl)) {
-            return;
-        }
+    function updateUI() {
+        const masterSwitch = switches.masterEnabled.el;
+        const masterStatusText = document.getElementById('masterStatusText');
+        masterStatusText.textContent = masterSwitch.checked ? '所有功能已啟用' : '所有功能已停用';
+        
+        Object.values(switches).forEach(config => {
+            if (config.parent) {
+                const parentSwitch = document.querySelector(config.parent);
+                const settingDiv = config.el.closest('.setting');
+                if (parentSwitch && settingDiv) {
+                    settingDiv.classList.toggle('disabled', !parentSwitch.checked);
+                    config.el.disabled = !parentSwitch.checked;
+                }
+            }
+        });
 
-        let statusText = '';
-        let color = '#6c757d';
-        const isActionSwitch = switchConfig.type === 'action';
-        const isSubOption = switchConfig.type === 'sub-option';
-        const isDisabledByParent = (isActionSwitch || isSubOption) && !parentIsEnabled;
-        const label = switchConfig.label || `[${switchConfig.key}]`;
+        document.querySelectorAll('.feature-group-toggle').forEach(groupToggle => {
+            const group = groupToggle.dataset.group;
+            const groupSwitches = Object.values(switches).filter(s => s.group === group);
+            const isAllOn = groupSwitches.every(s => s.el.checked);
+            groupToggle.checked = isAllOn;
+        });
+    }
 
-        if (switchConfig.key === 'masterEnabled') {
-            statusText = `${isEnabled ? '啟用' : '停用'} ${label}`;
-            color = isEnabled ? '#28a745' : '#6c757d';
-        } else if (isActionSwitch) {
-            const action = isEnabled ? '點擊' : '聚焦(需按Enter鍵)';
-            statusText = `${label}: ${action}`;
-            color = isDisabledByParent ? '#aaa' : (isEnabled ? '#007bff' : '#ffc107');
-        } else if (isSubOption) {
-            statusText = `${label} (${isEnabled ? '已啟用' : '已停用'})`;
-            color = isDisabledByParent ? '#aaa' : (isEnabled ? '#28a745' : '#6c757d');
+    function loadStatesAndInit() {
+        const keys = Object.keys(switches);
+        chrome.storage.sync.get(keys, (data) => {
+            keys.forEach(key => {
+                if (switches[key].el) {
+                    switches[key].el.checked = data[key] ?? true;
+                }
+            });
+            updateUI();
+        });
+    }
+
+    document.body.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target.type !== 'checkbox') return;
+
+        if (target.id === 'masterSwitch') {
+            const isEnabled = target.checked;
+            Object.entries(switches).forEach(([key, config]) => {
+                if (config.el.checked !== isEnabled) {
+                    config.el.checked = isEnabled;
+                }
+                saveState(key, isEnabled);
+            });
+        } else if (target.classList.contains('feature-group-toggle')) {
+            const group = target.dataset.group;
+            const isEnabled = target.checked;
+            Object.entries(switches).forEach(([key, config]) => {
+                if (config.group === group) {
+                    if(config.el.checked !== isEnabled) {
+                        config.el.checked = isEnabled;
+                    }
+                    saveState(key, isEnabled);
+                }
+            });
         } else {
-            statusText = `${label} (${isEnabled ? '已啟用' : '已停用'})`;
-            color = isEnabled ? '#28a745' : '#6c757d';
+            const changedSwitch = Object.entries(switches).find(([, config]) => config.el === target);
+            if (changedSwitch) {
+                const [key, config] = changedSwitch;
+                saveState(key, config.el.checked);
+            }
         }
+        
+        updateUI();
+    });
 
-        switchConfig.textEl.textContent = statusText;
-        switchConfig.textEl.style.color = color;
-
-        if ((isActionSwitch || isSubOption) && switchConfig.container) {
-             switchConfig.container.classList.toggle('disabled-parent', isDisabledByParent);
-        }
-    }
-
-    function updateChildSwitchUI(childConfig) {
-        if (!childConfig?.el || !childConfig.parentKey) {
-             return;
-        }
-
-        const parentConfigKey = childConfig.parentKey;
-        const parentConfig = Object.values(switches).find(p => p.key === parentConfigKey || (p.el && p.el.id === parentConfigKey + 'Switch'));
-
-        const parentIsEnabled = parentConfig?.el?.checked ?? true;
-
-        childConfig.el.disabled = !parentIsEnabled;
-        updateStatusText(childConfig, childConfig.el.checked, parentIsEnabled);
-    }
-
-
-    function loadAllStates() {
-        const keysToGet = {};
-        Object.values(switches).forEach(config => {
-            keysToGet[config.key] = config.default;
-        });
-
-        chrome.storage.sync.get(keysToGet, (data) => {
-            const lastError = chrome.runtime.lastError;
-            if (lastError || !data) {
-                 Object.values(switches).forEach(config => {
-                     if(config.el) config.el.checked = config.default;
-                     if(config.textEl && document.body.contains(config.textEl)) {
-                        config.textEl.textContent = (config.label || config.key) + (lastError ? " (讀取錯誤)" : " (無資料)");
-                        config.textEl.style.color = '#dc3545';
-                     }
-                     if(config.el && config.parentKey) config.el.disabled = true;
-                });
-                return;
+    document.body.addEventListener('click', (event) => {
+        const header = event.target.closest('.feature-card__header');
+        if (header) {
+            const card = header.closest('.feature-card');
+            if (card) {
+                card.querySelector('.feature-card__body').classList.toggle('collapsed');
             }
-
-            Object.values(switches).forEach(config => {
-                if (config.el) {
-                    const loadedValue = data[config.key];
-                    config.el.checked = typeof loadedValue === 'boolean' ? loadedValue : config.default;
-                }
-            });
-
-            Object.values(switches).forEach(config => {
-                if (config.el) {
-                    if (config.parentKey) {
-                        updateChildSwitchUI(config);
-                    } else {
-                        updateStatusText(config, config.el.checked);
-                    }
-                }
-            });
-            syncMasterSwitchUI(false);
-        });
-    }
-
-    function saveState(key, value, callback) {
-        chrome.storage.sync.set({ [key]: value }, () => {
-            const lastError = chrome.runtime.lastError;
-            if (lastError && !lastError.message?.includes("message port closed")) {
-            }
-            if (typeof callback === 'function') {
-                if (!lastError || !lastError.message?.includes("message port closed")) {
-                    callback(lastError);
-                }
-            }
-        });
-    }
-
-    function syncMasterSwitchUI(shouldSave = true) {
-        const masterConfig = switches.master;
-        if (!masterConfig?.el || !document.body.contains(masterConfig.el)) return false;
-
-        const masterSwitch = masterConfig.el;
-        let isAnyFeatureOn = false;
-        Object.values(switches).forEach(config => {
-            if (!config.parentKey && config.key !== masterConfig.key && config.el?.checked) {
-                isAnyFeatureOn = true;
-            }
-        });
-
-        let masterStateChanged = false;
-        const currentMasterState = masterSwitch.checked;
-        let newMasterState = currentMasterState;
-
-        if (currentMasterState && !isAnyFeatureOn) newMasterState = false;
-        else if (!currentMasterState && isAnyFeatureOn) newMasterState = true;
-
-        if (newMasterState !== currentMasterState) {
-            masterStateChanged = true;
-            masterSwitch.checked = newMasterState;
-            updateStatusText(masterConfig, newMasterState);
-            if (shouldSave) {
-                saveState(masterConfig.key, newMasterState);
-            }
-            Object.values(switches).forEach(childConfig => {
-                if (childConfig.parentKey) updateChildSwitchUI(childConfig);
-            });
-        }
-        return masterStateChanged;
-    }
-
-    loadAllStates();
-
-    Object.values(switches).forEach(config => {
-        if (config.el) {
-            config.el.addEventListener('change', () => {
-                if (!config.el || !document.body.contains(config.el)) return;
-
-                const newState = config.el.checked;
-                const changedKey = config.key;
-
-                saveState(changedKey, newState, (error) => {
-                    let parentIsEnabled = true;
-                    if (config.parentKey) {
-                        const parentConfigKey = config.parentKey;
-                        const parentConfig = Object.values(switches).find(p => p.key === parentConfigKey || (p.el && p.el.id === parentConfigKey + 'Switch'));
-                        parentIsEnabled = parentConfig?.el?.checked ?? true;
-                    }
-                    updateStatusText(config, newState, parentIsEnabled);
-                });
-
-                if (changedKey === switches.master.key) {
-                    Object.values(switches).forEach(childConfig => {
-                        if (!childConfig.parentKey && childConfig.key !== switches.master.key && childConfig.el) {
-                            if (childConfig.el.checked !== newState) {
-                                childConfig.el.checked = newState;
-                                saveState(childConfig.key, newState, (err) => updateStatusText(childConfig, newState));
-                            }
-                            Object.values(switches).forEach(subConfig => {
-                                if (subConfig.parentKey === childConfig.key) updateChildSwitchUI(subConfig);
-                            });
-                        } else if (childConfig.parentKey === switches.master.key) {
-                             updateChildSwitchUI(childConfig);
-                        }
-                    });
-                } else if (!config.parentKey) {
-                    Object.values(switches).forEach(subConfig => {
-                        if (subConfig.parentKey === changedKey && subConfig.el) {
-                             updateChildSwitchUI(subConfig);
-                        }
-                    });
-                    syncMasterSwitchUI();
-                } else {
-                    syncMasterSwitchUI();
-                }
-            });
         }
     });
+
+    loadStatesAndInit();
 });
