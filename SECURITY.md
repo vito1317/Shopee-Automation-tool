@@ -29,7 +29,7 @@ To report a security vulnerability, please send an email to:
 
 Please include the following details in your report:
 
-*   **Extension Version:** The version of the tool you are using (e.g., v5.25.2).
+*   **Extension Version:** The version of the tool you are using (e.g., v5.25.3).
 *   **Vulnerability Description:** A clear and concise description of the vulnerability.
 *   **Steps to Reproduce:** Detailed steps that can be followed to reproduce the issue. This is the most important part of the report.
 *   **Impact:** A description of the potential impact of the vulnerability (e.g., data leakage, unauthorized actions).
