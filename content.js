@@ -550,7 +550,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-
+            
             const lastCheckbox = document.getElementById('group_next_day_auto_scan') || document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
             if (lastCheckbox) {
                 lastCheckbox.insertAdjacentElement('afterend', groupLabel);
@@ -1416,7 +1416,7 @@ window.addEventListener('DOMContentLoaded', () => {
                                     updateStatusSpan(statusPrefix + `已輸入文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
                                     await new Promise(r => setTimeout(r, 500));
                                 } catch (simError) {
-                                    updateStatusSpan(statusPrefix + `輸入文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
+                                    updateStatusSpan(statusPrefix + `輸入文字條碼 ${code.substring(0,6)}... 失败`, 'red');
                                 }
                             }
                             currentRuntimeFeatureStates = await getFeatureStatesFromContent();
