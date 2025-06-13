@@ -28,7 +28,7 @@
     const INVALID_ORDER_RETCODE = 1501010;
     const SUCCESS_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/success-alert.c7545e0a.mp3';
     const FAILURE_SOUND_URL = 'https://sp.spx.shopee.tw/static/media/failure-alert.3a69fd73.mp3';
-    const RETRY_DELAY_MS = 200;
+    const RETRY_DELAY_MS = 100;
 
     const retryingShipmentIds = new Set();
     let messageTimeoutId = null;
