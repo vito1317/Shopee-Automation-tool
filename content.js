@@ -86,7 +86,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
         startNextDayFeature();
         startAutoScanFeatures();
-        manageTTSFeature();
 
         if (featureStates.hasOwnProperty('featureQueueingEnabled')) {
             if (!featureStates.featureQueueingEnabled) {
@@ -101,7 +100,6 @@ window.addEventListener('DOMContentLoaded', () => {
         stopNextDayFeature();
         stopAutoScanFeatures();
         stopAutoCallNumberFeature();
-        stopCheckoutDataProcessingAndTTS();
         if (typeof window.removeShopeeFileScannerUI === 'function') {
             window.removeShopeeFileScannerUI();
         }
@@ -117,7 +115,12 @@ window.addEventListener('DOMContentLoaded', () => {
         const isOnTargetUrl = newUrl.startsWith(CHECKOUT_TARGET_URL);
         const previousUrlWasTarget = currentUrl.startsWith(CHECKOUT_TARGET_URL);
 
-        manageTTSFeature();
+        if (!isOnTargetUrl && previousUrlWasTarget) {
+            stopCheckoutDataProcessingAndTTS();
+        } else if (isOnTargetUrl && (!previousUrlWasTarget || newUrl !== currentUrl || isInitialLoad)) {
+            stopCheckoutDataProcessingAndTTS();
+            startCheckoutDataProcessingAndTTS();
+        }
 
         let needsCheckoutActionReset = false;
         if (isInitialLoad) {
@@ -506,13 +509,7 @@ window.addEventListener('DOMContentLoaded', () => {
             
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-
-            const lastCheckbox = document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
-            if (lastCheckbox) {
-                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
-            } else {
-                sscDiv.appendChild(groupLabel);
-            }
+            sscDiv.appendChild(groupLabel);
         } else {
             const existingCheckbox = groupLabel.querySelector('#nextDayAutoScanCheckbox');
             if (existingCheckbox && existingCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
@@ -553,7 +550,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
             groupLabel.appendChild(checkbox);
             groupLabel.appendChild(span);
-            sscDiv.appendChild(groupLabel);
+
+            const lastCheckbox = document.getElementById('group_next_day_auto_scan') || document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
+            if (lastCheckbox) {
+                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
+            } else {
+                sscDiv.appendChild(groupLabel);
+            }
         } else {
             const existingCheckbox = groupLabel.querySelector('#toAutoScanCheckbox');
             if (existingCheckbox && existingCheckbox.checked !== featureStates.featureToAutoScanEnabled) {
@@ -567,17 +570,8 @@ window.addEventListener('DOMContentLoaded', () => {
         if (groupEl) groupEl.remove();
     }
 
-    function manageTTSFeature() {
-        const isOnTargetUrl = window.location.href.startsWith(CHECKOUT_TARGET_URL);
-        const isTTSEnabled = featureStates.masterEnabled && featureStates.featureTTSEnabled;
-
-        if (isOnTargetUrl && isTTSEnabled) {
-            startCheckoutDataProcessingAndTTS();
-        } else {
-            stopCheckoutDataProcessingAndTTS();
-        }
-    }
-
+    loadFeatureStates();
+    
     function startCheckoutDataProcessingAndTTS() {
         if (checkoutDataProcessingIntervalId === null) {
             spokenPhrasesThisSession.clear();
