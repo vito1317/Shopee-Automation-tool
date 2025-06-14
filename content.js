@@ -42,8 +42,17 @@ function removeKioskOverlay() {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'showKioskOverlay') createKioskOverlay();
-    else if (request.action === 'hideKioskOverlay') removeKioskOverlay();
+    if (request.action === 'showKioskOverlay') {
+        createKioskOverlay();
+    } else if (request.action === 'hideKioskOverlay') {
+        removeKioskOverlay();
+    } else if (request.action === 'toggleKioskOverlay') {
+        if (document.getElementById('kiosk-overlay')) {
+            removeKioskOverlay();
+        } else {
+            createKioskOverlay();
+        }
+    }
 });
 
 chrome.runtime.sendMessage({ action: 'checkKioskStatus' }, (response) => {

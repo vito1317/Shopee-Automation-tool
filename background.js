@@ -19,8 +19,6 @@ const MIDNIGHT_ALARM = 'disableFeaturesAtMidnight';
 const KIOSK_CLOSE_ALARM = 'kioskCloseAtNight';
 const KIOSK_OPEN_ALARM = 'kioskOpenInMorning';
 
-let isTestOverlayActive = false;
-
 function disableAllFeatures() {
     const statesToSave = {};
     FEATURE_KEYS.forEach(key => {
@@ -86,8 +84,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'toggleTestOverlay') {
-        isTestOverlayActive = !isTestOverlayActive;
-        sendMessageToShopeeTabs({ action: isTestOverlayActive ? 'showKioskOverlay' : 'hideKioskOverlay' });
+        sendMessageToShopeeTabs({ action: 'toggleKioskOverlay' });
     } else if (request.action === 'checkKioskStatus') {
         chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
             if (kioskModeEnabled) {
