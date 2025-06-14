@@ -47,7 +47,7 @@ function scheduleKioskAlarms(isKioskEnabled) {
     }
 }
 
-async function sendMessageToShopeeTabs(message){
+async function sendMessageToShopeeTabs(message) {
     try {
         const tabs = await chrome.tabs.query({ url: "https://sp.spx.shopee.tw/*" });
         if (!tabs || tabs.length === 0) {
@@ -103,11 +103,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
             if (kioskModeEnabled) {
                 const now = new Date();
-                const closeTime = new Date();
-                closeTime.setHours(22, 30, 0, 0);
                 const openTime = new Date();
                 openTime.setHours(11, 30, 0, 0);
-                sendResponse({ show: !(now >= openTime && now < closeTime) });
+                const closeTime = new Date();
+                closeTime.setHours(22, 30, 0, 0);
+
+                const isOpen = now >= openTime && now < closeTime;
+                
+                sendResponse({ show: !isOpen });
             } else {
                 sendResponse({ show: false });
             }
