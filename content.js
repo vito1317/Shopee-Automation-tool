@@ -17,6 +17,10 @@ function createKioskOverlay() {
     const text = document.createElement('p');
     text.textContent = '已打烊，謝謝光臨';
     
+    const businessHours = document.createElement('p');
+    businessHours.textContent = '營業時間:上午11:30~晚上10:30';
+    businessHours.style.cssText = 'font-size: 0.5em; color: #dddddd; margin-top: 10px; font-weight: normal;';
+
     const animation = document.createElement('div');
     animation.style.cssText = `width: 80px; height: 40px; display: flex; justify-content: space-around; align-items: center; margin-top: 20px;`;
     
@@ -28,6 +32,7 @@ function createKioskOverlay() {
     }
     
     overlay.appendChild(text);
+    overlay.appendChild(businessHours);
     overlay.appendChild(animation);
     
     const style = document.createElement('style');
