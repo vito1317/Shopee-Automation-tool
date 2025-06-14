@@ -47,25 +47,35 @@ function scheduleKioskAlarms(isKioskEnabled) {
     }
 }
 
-function sendMessageToShopeeTabs(message) {
-    chrome.tabs.query({ url: "https://sp.spx.shopee.tw/*" }, (tabs) => {
-        tabs.forEach(tab => {
+async function sendMessageToShopeeTabs(message){
+    try {
+        const tabs = await chrome.tabs.query({ url: "https://sp.spx.shopee.tw/*" });
+        if (!tabs || tabs.length === 0) {
+            return false;
+        }
+
+        let sentCount = 0;
+        for (const tab of tabs) {
             if (tab.id) {
-                 chrome.tabs.sendMessage(tab.id, message, (response) => {
-                    if (chrome.runtime.lastError) {} 
+                chrome.tabs.sendMessage(tab.id, message, (response) => {
+                    if (chrome.runtime.lastError) { }
                 });
+                sentCount++;
             }
-        });
-    });
+        }
+        return sentCount > 0;
+    } catch (error) {
+        return false;
+    }
 }
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === MIDNIGHT_ALARM) {
         disableAllFeatures();
     } else if (alarm.name === KIOSK_CLOSE_ALARM) {
-        sendMessageToShopeeTabs({ action: 'showKioskOverlay' });
+        await sendMessageToShopeeTabs({ action: 'showKioskOverlay' });
     } else if (alarm.name === KIOSK_OPEN_ALARM) {
-        sendMessageToShopeeTabs({ action: 'hideKioskOverlay' });
+        await sendMessageToShopeeTabs({ action: 'hideKioskOverlay' });
     }
 });
 
@@ -84,7 +94,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'toggleTestOverlay') {
-        sendMessageToShopeeTabs({ action: 'toggleKioskOverlay' });
+        (async () => {
+            const success = await sendMessageToShopeeTabs({ action: 'toggleKioskOverlay' });
+            sendResponse({ success: success });
+        })();
+        return true;
     } else if (request.action === 'checkKioskStatus') {
         chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
             if (kioskModeEnabled) {
@@ -98,6 +112,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ show: false });
             }
         });
-        return true; 
+        return true;
     }
 });

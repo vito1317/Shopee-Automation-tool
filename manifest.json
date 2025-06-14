@@ -1,48 +1,53 @@
 {
     "manifest_version": 3,
     "name": "蝦皮自動化工具",
-    "version": "5.25.4",
+    "version": "6.25.4",
     "description": "整合多種蝦皮自動化功能。功能包誇:自動叫號、自動結帳、自動播報語音(tts)、自動刷取物流單、自動完成隔日、裝箱時自動刷取隔日寄件、自動刷入電子檔、TO單列印時自動刷取。可透過工具列圖示開關。(僅限蝦皮內部使用)",
-    "background": {
-      "service_worker": "background.js"
-    },
-    "icons": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    },
     "permissions": [
-      "storage","alarms"
+        "storage",
+        "alarms",
+        "tabs"
+    ],
+    "host_permissions": [
+        "https://sp.spx.shopee.tw/*"
     ],
     "action": {
-      "default_popup": "popup.html",
-      "default_icon": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "icons": {
         "16": "icons/icon16.png",
-        "48": "icons/icon48.png"
-      },
-      "default_title": "蝦皮自動化工具設定"
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "background": {
+        "service_worker": "background.js"
     },
     "content_scripts": [
-      {
-        "matches": ["https://sp.spx.shopee.tw/*"],
-        "js": [
-            "libs/pdf.min.js",  
-            "libs/html5-qrcode.min.js",
-            "libs/pdf.worker.min.js",
-            "content.js"         
-        ],
-        "run_at": "document_start"
-      }
+        {
+            "matches": [
+                "https://sp.spx.shopee.tw/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_start"
+        }
     ],
     "web_accessible_resources": [
-      {
-        "resources": [
-            "interceptor.js",
-            "libs/html5-qrcode.min.js",
-            "libs/pdf.min.js",
-            "libs/pdf.worker.min.js"
-         ],
-        "matches": ["<all_urls>"]
-      }
+        {
+            "resources": [
+                "interceptor.js",
+                "libs/html5-qrcode.min.js",
+                "libs/pdf.worker.min.js"
+            ],
+            "matches": [
+                "https://sp.spx.shopee.tw/*"
+            ]
+        }
     ]
-  }
+}

@@ -105,7 +105,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     testKioskButton.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ action: 'toggleTestOverlay' });
+        chrome.runtime.sendMessage({ action: 'toggleTestOverlay' }, (response) => {
+            if (chrome.runtime.lastError) {
+                alert('無法與擴充功能背景通訊，請嘗試重新整理頁面。');
+                return;
+            }
+            if (!response || !response.success) {
+                alert('測試失敗。請確認您已開啟至少一個蝦皮SPX作業分頁。');
+            }
+        });
     });
 
     loadStatesAndInit();
