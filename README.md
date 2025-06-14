@@ -1,6 +1,6 @@
 
 ---
-# 蝦皮自動化工具 v6.25.1
+# 蝦皮自動化工具 v6.25.2
 
 <p>
   <a href="https://chromewebstore.google.com/detail/gjlkkpgkdecjgcnekbgbcidokfcnciig">
@@ -96,7 +96,7 @@
 <details>
 <summary><strong>點此展開閱讀完整的免責聲明</strong></summary>
 
-### **蝦皮自動化工具 (v6.25.1) 免責聲明**
+### **蝦皮自動化工具 (v6.25.2) 免責聲明**
 
 **重要提示：本工具僅限蝦皮 (Shopee) 內部員工基於提升工作效率之目的使用。安裝與使用本工具前，請務必詳細閱讀、理解並同意以下所有條款。**
 
