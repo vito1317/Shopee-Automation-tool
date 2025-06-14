@@ -17,111 +17,124 @@
             <span id="masterStatusText">啟用所有功能</span>
         </div>
     </div>
+    
+    <hr>
+    
+    <div class="feature-card">
+        <div class="feature-card__header">
+            <span class="feature-card__icon">ℹ️</span>
+            <span class="feature-card__title">資訊站模式</span>
+        </div>
+        <div class="feature-card__body">
+             <div class="setting">
+                <span class="setting-label">啟用資訊站模式</span>
+                <label class="switch"><input type="checkbox" id="kioskModeSwitch"><span class="slider round"></span></label>
+            </div>
+            <button id="testKioskButton">測試打烊畫面</button>
+        </div>
+    </div>
 
-    <div class="cards-container">
+    <div id="other-features-container">
+        <h4>功能開關:</h4>
+        <div class="cards-container">
+            <div class="feature-card">
+                <div class="feature-card__header">
+                    <span class="feature-card__icon">🤖</span>
+                    <span class="feature-card__title">自動化操作</span>
+                    <div class="feature-card__toggle-container">
+                        <label class="switch small-switch">
+                            <input type="checkbox" class="feature-group-toggle" data-group="automation">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="feature-card__body collapsed">
+                    <div class="setting" data-parent-group="automation">
+                        <span class="setting-label">自動叫號</span>
+                        <label class="switch"><input type="checkbox" id="featureQueueingSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureQueueingSwitch">
+                        <span class="setting-label">動作: 點擊 / 聚焦</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureQueueingActionSwitch"><span class="slider round"></span></label>
+                    </div>
 
-        <div class="feature-card">
-            <div class="feature-card__header">
-                <span class="feature-card__icon">🤖</span>
-                <span class="feature-card__title">自動化操作</span>
-                <div class="feature-card__toggle-container">
-                    <label class="switch small-switch">
-                        <input type="checkbox" class="feature-group-toggle" data-group="automation">
-                        <span class="slider round"></span>
-                    </label>
+                    <div class="setting" data-parent-group="automation">
+                        <span class="setting-label">自動結帳</span>
+                        <label class="switch"><input type="checkbox" id="featureCheckoutSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureCheckoutSwitch">
+                        <span class="setting-label">動作: 點擊 / 聚焦</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureCheckoutActionSwitch"><span class="slider round"></span></label>
+                    </div>
                 </div>
             </div>
-            <div class="feature-card__body collapsed">
-                <div class="setting" data-parent-group="automation">
-                    <span class="setting-label">自動叫號</span>
-                    <label class="switch"><input type="checkbox" id="featureQueueingSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting sub-setting" data-parent-switch="#featureQueueingSwitch">
-                    <span class="setting-label">動作: 點擊 / 聚焦</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureQueueingActionSwitch"><span class="slider round"></span></label>
-                </div>
 
-                <div class="setting" data-parent-group="automation">
-                    <span class="setting-label">自動結帳</span>
-                    <label class="switch"><input type="checkbox" id="featureCheckoutSwitch"><span class="slider round"></span></label>
+            <div class="feature-card">
+                <div class="feature-card__header">
+                    <span class="feature-card__icon">📦</span>
+                    <span class="feature-card__title">裝箱與刷件</span>
+                    <div class="feature-card__toggle-container">
+                        <label class="switch small-switch">
+                            <input type="checkbox" class="feature-group-toggle" data-group="packing">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
                 </div>
-                <div class="setting sub-setting" data-parent-switch="#featureCheckoutSwitch">
-                    <span class="setting-label">動作: 點擊 / 聚焦</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureCheckoutActionSwitch"><span class="slider round"></span></label>
+                <div class="feature-card__body collapsed">
+                    <div class="setting" data-parent-group="packing">
+                        <span class="setting-label">自動完成隔日</span>
+                        <label class="switch"><input type="checkbox" id="featureNextDaySwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureNextDaySwitch">
+                        <span class="setting-label">自動開始下一筆</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureNextDayAutoStartSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureNextDaySwitch">
+                        <span class="setting-label">一件一箱自動裝箱</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureOneItemPerBoxSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting" data-parent-group="packing">
+                        <span class="setting-label">隔日自動刷件</span>
+                        <label class="switch"><input type="checkbox" id="featureNextDayAutoScanSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting" data-parent-group="packing">
+                        <span class="setting-label">TO單自動刷取</span>
+                        <label class="switch"><input type="checkbox" id="featureToAutoScanSwitch"><span class="slider round"></span></label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-card__header">
+                    <span class="feature-card__icon">🛠️</span>
+                    <span class="feature-card__title">輔助功能</span>
+                    <div class="feature-card__toggle-container">
+                        <label class="switch small-switch">
+                            <input type="checkbox" class="feature-group-toggle" data-group="assistance">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="feature-card__body collapsed">
+                    <div class="setting" data-parent-group="assistance">
+                        <span class="setting-label">TTS 語音播報</span>
+                        <label class="switch"><input type="checkbox" id="featureTTSSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureTTSSwitch">
+                        <span class="setting-label">播報櫃位/末三碼</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureTTSLocationSwitch"><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureTTSSwitch">
+                        <span class="setting-label">播報金額</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureTTSAmountSwitch"><span class="slider round"></span></label>
+                    </div>
+                     <div class="setting" data-parent-group="assistance">
+                        <span class="setting-label">自動刷取電子檔</span>
+                        <label class="switch"><input type="checkbox" id="featureFileScanSwitch"><span class="slider round"></span></label>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="feature-card">
-            <div class="feature-card__header">
-                <span class="feature-card__icon">📦</span>
-                <span class="feature-card__title">裝箱與刷件</span>
-                <div class="feature-card__toggle-container">
-                    <label class="switch small-switch">
-                        <input type="checkbox" class="feature-group-toggle" data-group="packing">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="feature-card__body collapsed">
-                <div class="setting" data-parent-group="packing">
-                    <span class="setting-label">自動完成隔日</span>
-                    <label class="switch"><input type="checkbox" id="featureNextDaySwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting sub-setting" data-parent-switch="#featureNextDaySwitch">
-                    <span class="setting-label">自動開始下一筆</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureNextDayAutoStartSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting sub-setting" data-parent-switch="#featureNextDaySwitch">
-                    <span class="setting-label">一件一箱自動裝箱</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureOneItemPerBoxSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting" data-parent-group="packing">
-                    <span class="setting-label">隔日自動刷件</span>
-                    <label class="switch"><input type="checkbox" id="featureNextDayAutoScanSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting" data-parent-group="packing">
-                    <span class="setting-label">TO單自動刷取</span>
-                    <label class="switch"><input type="checkbox" id="featureToAutoScanSwitch"><span class="slider round"></span></label>
-                </div>
-                 <div class="setting" data-parent-group="packing">
-                    <span class="setting-label">自動刷取物流箱單</span>
-                    <label class="switch"><input type="checkbox" id="featureBoxScanSwitch"><span class="slider round"></span></label>
-                </div>
-            </div>
-        </div>
-        
-        <div class="feature-card">
-            <div class="feature-card__header">
-                <span class="feature-card__icon">🛠️</span>
-                <span class="feature-card__title">輔助功能</span>
-                <div class="feature-card__toggle-container">
-                    <label class="switch small-switch">
-                        <input type="checkbox" class="feature-group-toggle" data-group="assistance">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="feature-card__body collapsed">
-                <div class="setting" data-parent-group="assistance">
-                    <span class="setting-label">TTS 語音播報</span>
-                    <label class="switch"><input type="checkbox" id="featureTTSSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting sub-setting" data-parent-switch="#featureTTSSwitch">
-                    <span class="setting-label">播報櫃位/末三碼</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureTTSLocationSwitch"><span class="slider round"></span></label>
-                </div>
-                <div class="setting sub-setting" data-parent-switch="#featureTTSSwitch">
-                    <span class="setting-label">播報金額</span>
-                    <label class="switch small-switch"><input type="checkbox" id="featureTTSAmountSwitch"><span class="slider round"></span></label>
-                </div>
-                 <div class="setting" data-parent-group="assistance">
-                    <span class="setting-label">自動刷取電子檔</span>
-                    <label class="switch"><input type="checkbox" id="featureFileScanSwitch"><span class="slider round"></span></label>
-                </div>
-            </div>
-        </div>
-
     </div>
 
     <script src="popup.js"></script>

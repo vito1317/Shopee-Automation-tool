@@ -1,11 +1,12 @@
 const FEATURE_KEYS = [
     'masterEnabled',
     'featureFileScanEnabled',
-    'featureBoxScanEnabled',
     'featureQueueingEnabled',
+    'featureQueueingAction',
     'featureNextDayEnabled',
     'featureNextDayAutoStartEnabled',
     'featureCheckoutEnabled',
+    'featureCheckoutAction',
     'featureOneItemPerBoxEnabled',
     'featureTTSEnabled',
     'featureTTSLocationEnabled',
@@ -14,57 +15,92 @@ const FEATURE_KEYS = [
     'featureToAutoScanEnabled'
 ];
 
-const ALARM_NAME = 'disableFeaturesAtMidnight';
+const MIDNIGHT_ALARM = 'disableFeaturesAtMidnight';
+const KIOSK_CLOSE_ALARM = 'kioskCloseAtNight';
+const KIOSK_OPEN_ALARM = 'kioskOpenInMorning';
+
+let isTestOverlayActive = false;
 
 function disableAllFeatures() {
     const statesToSave = {};
     FEATURE_KEYS.forEach(key => {
         statesToSave[key] = false;
     });
-
-    chrome.storage.sync.set(statesToSave, () => {
-        if (chrome.runtime.lastError) {
-            console.error("Background: Error disabling features at midnight:", chrome.runtime.lastError);
-        } else {
-            console.log("Background: All features automatically disabled at midnight.", new Date());
-        }
-    });
+    chrome.storage.sync.set(statesToSave);
 }
 
-function scheduleAlarm() {
+function getScheduledTime(hour, minute) {
     const now = new Date();
-
-    let nextMidnightRunTime = new Date();
-    nextMidnightRunTime.setUTCHours(16, 0, 0, 0); 
-
-    if (now.getTime() >= nextMidnightRunTime.getTime()) {
-        nextMidnightRunTime.setUTCDate(nextMidnightRunTime.getUTCDate() + 1);
+    const time = new Date();
+    time.setHours(hour, minute, 0, 0);
+    if (now.getTime() > time.getTime()) {
+        time.setDate(time.getDate() + 1);
     }
+    return time.getTime();
+}
 
-    chrome.alarms.clear(ALARM_NAME, (wasCleared) => {
-        chrome.alarms.create(ALARM_NAME, {
-            when: nextMidnightRunTime.getTime()
+function scheduleKioskAlarms(isKioskEnabled) {
+    chrome.alarms.clear(KIOSK_CLOSE_ALARM);
+    chrome.alarms.clear(KIOSK_OPEN_ALARM);
+
+    if (isKioskEnabled) {
+        chrome.alarms.create(KIOSK_CLOSE_ALARM, { when: getScheduledTime(22, 30), periodInMinutes: 24 * 60 });
+        chrome.alarms.create(KIOSK_OPEN_ALARM, { when: getScheduledTime(11, 30), periodInMinutes: 24 * 60 });
+    }
+}
+
+function sendMessageToShopeeTabs(message) {
+    chrome.tabs.query({ url: "https://sp.spx.shopee.tw/*" }, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.id) {
+                 chrome.tabs.sendMessage(tab.id, message, (response) => {
+                    if (chrome.runtime.lastError) {} 
+                });
+            }
         });
     });
 }
 
-
 chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === ALARM_NAME) {
+    if (alarm.name === MIDNIGHT_ALARM) {
         disableAllFeatures();
-        scheduleAlarm();
+    } else if (alarm.name === KIOSK_CLOSE_ALARM) {
+        sendMessageToShopeeTabs({ action: 'showKioskOverlay' });
+    } else if (alarm.name === KIOSK_OPEN_ALARM) {
+        sendMessageToShopeeTabs({ action: 'hideKioskOverlay' });
     }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-    scheduleAlarm();
+    chrome.alarms.create(MIDNIGHT_ALARM, { when: getScheduledTime(0, 0), periodInMinutes: 24 * 60 });
+    chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
+        scheduleKioskAlarms(kioskModeEnabled);
+    });
 });
 
-chrome.runtime.onStartup.addListener(() => {
-    chrome.alarms.get(ALARM_NAME, (existingAlarm) => {
-        if (!existingAlarm) {
-            scheduleAlarm();
-        } else {
-        }
-    });
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync' && changes.kioskModeEnabled) {
+        scheduleKioskAlarms(changes.kioskModeEnabled.newValue);
+    }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'toggleTestOverlay') {
+        isTestOverlayActive = !isTestOverlayActive;
+        sendMessageToShopeeTabs({ action: isTestOverlayActive ? 'showKioskOverlay' : 'hideKioskOverlay' });
+    } else if (request.action === 'checkKioskStatus') {
+        chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
+            if (kioskModeEnabled) {
+                const now = new Date();
+                const closeTime = new Date();
+                closeTime.setHours(22, 30, 0, 0);
+                const openTime = new Date();
+                openTime.setHours(11, 30, 0, 0);
+                sendResponse({ show: !(now >= openTime && now < closeTime) });
+            } else {
+                sendResponse({ show: false });
+            }
+        });
+        return true; 
+    }
 });

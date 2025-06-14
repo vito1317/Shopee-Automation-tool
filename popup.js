@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const switches = {
         masterEnabled: { el: document.getElementById('masterSwitch') },
+        kioskModeEnabled: { el: document.getElementById('kioskModeSwitch') },
         featureQueueingEnabled: { el: document.getElementById('featureQueueingSwitch'), group: 'automation' },
         featureQueueingAction: { el: document.getElementById('featureQueueingActionSwitch'), parent: '#featureQueueingSwitch' },
         featureCheckoutEnabled: { el: document.getElementById('featureCheckoutSwitch'), group: 'automation' },
@@ -8,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
         featureTTSEnabled: { el: document.getElementById('featureTTSSwitch'), group: 'assistance' },
         featureTTSLocationEnabled: { el: document.getElementById('featureTTSLocationSwitch'), parent: '#featureTTSSwitch' },
         featureTTSAmountEnabled: { el: document.getElementById('featureTTSAmountSwitch'), parent: '#featureTTSSwitch' },
-        featureBoxScanEnabled: { el: document.getElementById('featureBoxScanSwitch'), group: 'packing' },
         featureNextDayEnabled: { el: document.getElementById('featureNextDaySwitch'), group: 'packing' },
         featureNextDayAutoStartEnabled: { el: document.getElementById('featureNextDayAutoStartSwitch'), parent: '#featureNextDaySwitch' },
         featureOneItemPerBoxEnabled: { el: document.getElementById('featureOneItemPerBoxSwitch'), parent: '#featureNextDaySwitch' },
@@ -16,32 +16,42 @@ document.addEventListener('DOMContentLoaded', () => {
         featureToAutoScanEnabled: { el: document.getElementById('featureToAutoScanSwitch'), group: 'packing' },
         featureFileScanEnabled: { el: document.getElementById('featureFileScanSwitch'), group: 'assistance' }
     };
-
+    const otherFeaturesContainer = document.getElementById('other-features-container');
+    const testKioskButton = document.getElementById('testKioskButton');
+    
     function saveState(key, value) {
         chrome.storage.sync.set({ [key]: value });
     }
 
     function updateUI() {
-        const masterSwitch = switches.masterEnabled.el;
-        const masterStatusText = document.getElementById('masterStatusText');
-        masterStatusText.textContent = masterSwitch.checked ? '所有功能已啟用' : '所有功能已停用';
+        const kioskModeOn = switches.kioskModeEnabled.el.checked;
+        const masterOn = switches.masterEnabled.el.checked;
         
-        Object.values(switches).forEach(config => {
-            if (config.parent) {
-                const parentSwitch = document.querySelector(config.parent);
-                const settingDiv = config.el.closest('.setting');
-                if (parentSwitch && settingDiv) {
-                    settingDiv.classList.toggle('disabled', !parentSwitch.checked);
-                    config.el.disabled = !parentSwitch.checked;
-                }
-            }
+        otherFeaturesContainer.style.display = kioskModeOn ? 'none' : '';
+        switches.masterEnabled.el.disabled = kioskModeOn;
+        if (kioskModeOn) switches.masterEnabled.el.checked = false;
+
+        document.getElementById('masterStatusText').textContent = switches.masterEnabled.el.checked ? '所有功能已啟用' : '所有功能已停用';
+        
+        Object.entries(switches).forEach(([key, config]) => {
+            if (!config.el || key === 'masterEnabled' || key === 'kioskModeEnabled') return;
+
+            let parentSwitch = null;
+            if (config.parent) parentSwitch = document.querySelector(config.parent);
+
+            const isParentOn = parentSwitch ? parentSwitch.checked : true;
+            const isDisabled = kioskModeOn || !masterOn || !isParentOn;
+            
+            const settingDiv = config.el.closest('.setting');
+            if (settingDiv) settingDiv.classList.toggle('disabled', isDisabled);
+            config.el.disabled = isDisabled;
         });
 
         document.querySelectorAll('.feature-group-toggle').forEach(groupToggle => {
             const group = groupToggle.dataset.group;
             const groupSwitches = Object.values(switches).filter(s => s.group === group);
-            const isAnyOn = groupSwitches.some(s => s.el.checked);
-            groupToggle.checked = isAnyOn;
+            groupToggle.checked = groupSwitches.some(s => s.el.checked);
+            groupToggle.disabled = kioskModeOn || !masterOn;
         });
     }
 
@@ -50,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.get(keys, (data) => {
             keys.forEach(key => {
                 if (switches[key] && switches[key].el) {
-                    switches[key].el.checked = data[key] ?? true;
+                    switches[key].el.checked = data[key] === undefined ? true : data[key];
                 }
             });
             updateUI();
@@ -61,44 +71,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = event.target;
         if (target.type !== 'checkbox') return;
 
+        const key = Object.keys(switches).find(k => switches[k].el === target);
+        if (key) {
+            saveState(key, target.checked);
+        }
+
         if (target.id === 'masterSwitch') {
             const isEnabled = target.checked;
-            Object.entries(switches).forEach(([key, config]) => {
-                if (config.el.checked !== isEnabled) {
+            Object.entries(switches).forEach(([k, config]) => {
+                if (config.group && config.el.checked !== isEnabled) {
                     config.el.checked = isEnabled;
+                    saveState(k, isEnabled);
                 }
-                saveState(key, isEnabled);
             });
         } else if (target.classList.contains('feature-group-toggle')) {
             const group = target.dataset.group;
             const isEnabled = target.checked;
-            Object.entries(switches).forEach(([key, config]) => {
-                if (config.group === group) {
-                    if(config.el.checked !== isEnabled) {
-                        config.el.checked = isEnabled;
-                    }
-                    saveState(key, isEnabled);
+            Object.entries(switches).forEach(([k, config]) => {
+                if (config.group === group && config.el.checked !== isEnabled) {
+                    config.el.checked = isEnabled;
+                    saveState(k, isEnabled);
                 }
             });
-        } else {
-            const changedSwitch = Object.entries(switches).find(([, config]) => config.el === target);
-            if (changedSwitch) {
-                const [key] = changedSwitch;
-                saveState(key, target.checked);
-            }
         }
-        
         updateUI();
     });
 
     document.body.addEventListener('click', (event) => {
         const header = event.target.closest('.feature-card__header');
         if (header) {
-            const card = header.closest('.feature-card');
-            if (card) {
-                card.querySelector('.feature-card__body').classList.toggle('collapsed');
-            }
+            header.closest('.feature-card').querySelector('.feature-card__body').classList.toggle('collapsed');
         }
+    });
+    
+    testKioskButton.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'toggleTestOverlay' });
     });
 
     loadStatesAndInit();

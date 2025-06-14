@@ -6,12 +6,55 @@ function injectInterceptor() {
 }
 injectInterceptor();
 
+function createKioskOverlay() {
+    const overlayId = 'kiosk-overlay';
+    if (document.getElementById(overlayId)) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = overlayId;
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.9); z-index: 9999999; display: flex; justify-content: center; align-items: center; color: white; font-size: 3em; font-weight: bold; text-align: center; flex-direction: column; animation: fadeIn 0.5s ease-in-out;`;
+    
+    const text = document.createElement('p');
+    text.textContent = '已打烊，謝謝光臨';
+    
+    const animation = document.createElement('div');
+    animation.style.cssText = `width: 80px; height: 40px; display: flex; justify-content: space-around; align-items: center; margin-top: 20px;`;
+    
+    for(let i=0; i<3; i++) {
+        const dot = document.createElement('div');
+        dot.style.cssText = `width: 15px; height: 15px; border-radius: 50%; background-color: white; animation: pulse 1.4s ease-in-out infinite;`;
+        dot.style.animationDelay = `${i * 0.2}s`;
+        animation.appendChild(dot);
+    }
+    
+    overlay.appendChild(text);
+    overlay.appendChild(animation);
+    
+    const style = document.createElement('style');
+    style.textContent = `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes pulse { 0%, 70%, 100% { transform: scale(0.6); opacity: 0.5; } 35% { transform: scale(1); opacity: 1; } }`;
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+}
+
+function removeKioskOverlay() {
+    const overlay = document.getElementById('kiosk-overlay');
+    if (overlay) overlay.remove();
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'showKioskOverlay') createKioskOverlay();
+    else if (request.action === 'hideKioskOverlay') removeKioskOverlay();
+});
+
+chrome.runtime.sendMessage({ action: 'checkKioskStatus' }, (response) => {
+    if (response && response.show) createKioskOverlay();
+});
+
 window.addEventListener('DOMContentLoaded', () => {
 
     let featureStates = {
         masterEnabled: true,
         featureFileScanEnabled: true,
-        featureBoxScanEnabled: true,
         featureQueueingEnabled: true,
         featureQueueingAction: true,
         featureNextDayEnabled: true,
@@ -23,7 +66,8 @@ window.addEventListener('DOMContentLoaded', () => {
         featureTTSLocationEnabled: true,
         featureTTSAmountEnabled: true,
         featureNextDayAutoScanEnabled: true,
-        featureToAutoScanEnabled: true
+        featureToAutoScanEnabled: true,
+        kioskModeEnabled: false
     };
 
     function syncFeatureStatesToInterceptor(states) {
@@ -41,15 +85,11 @@ window.addEventListener('DOMContentLoaded', () => {
     function loadFeatureStates() {
         const keysToGet = Object.keys(featureStates);
         chrome.storage.sync.get(keysToGet, (data) => {
-            if (chrome.runtime.lastError) {
-                const defaultStates = {};
-                keysToGet.forEach(key => defaultStates[key] = featureStates[key]);
-                featureStates = { ...defaultStates, ...data };
-            } else {
-                featureStates = { ...featureStates, ...data };
-            }
+            Object.keys(featureStates).forEach(key => {
+                featureStates[key] = data[key] ?? featureStates[key];
+            });
             syncFeatureStatesToInterceptor(featureStates);
-            handleFeatureStateChange(true);
+            handleFeatureStateChange();
             checkUrlAndResetStates(window.location.href, true);
         });
     }
@@ -59,47 +99,55 @@ window.addEventListener('DOMContentLoaded', () => {
             let statesChanged = false;
             for (let key in changes) {
                 if (featureStates.hasOwnProperty(key)) {
-                    featureStates[key] = typeof changes[key].newValue === 'boolean' ? changes[key].newValue : featureStates[key];
+                    featureStates[key] = changes[key].newValue;
                     statesChanged = true;
                 }
             }
             if (statesChanged) {
                 syncFeatureStatesToInterceptor(featureStates);
-                handleFeatureStateChange(false);
+                handleFeatureStateChange();
             }
         }
     });
 
-    function handleFeatureStateChange(isInitialLoad = false) {
-        if (!featureStates.masterEnabled) {
+    function handleFeatureStateChange() {
+        if (!featureStates.masterEnabled || featureStates.kioskModeEnabled) {
             stopAllFeatures();
             return;
         }
 
-        if (featureStates.hasOwnProperty('featureFileScanEnabled')) {
-             if (!featureStates.featureFileScanEnabled) {
-                 if (typeof window.removeShopeeFileScannerUI === 'function') { window.removeShopeeFileScannerUI(); }
-             } else {
-                 if (typeof window.triggerShopeeFileScannerCheck === 'function') { window.triggerShopeeFileScannerCheck(); }
-             }
+        if (featureStates.featureFileScanEnabled) {
+             if (typeof window.triggerShopeeFileScannerCheck === 'function') window.triggerShopeeFileScannerCheck();
+        } else {
+             if (typeof window.removeShopeeFileScannerUI === 'function') window.removeShopeeFileScannerUI();
         }
 
-        startNextDayFeature();
-        startAutoScanFeatures();
-
-        if (featureStates.hasOwnProperty('featureQueueingEnabled')) {
-            if (!featureStates.featureQueueingEnabled) {
-                stopAutoCallNumberFeature();
-            } else {
-                startAutoCallNumberFeature();
-            }
+        if (featureStates.featureNextDayEnabled) {
+            startNextDayFeature();
+        } else {
+            stopNextDayFeature();
         }
+
+        if (featureStates.featureNextDayAutoScanEnabled || featureStates.featureToAutoScanEnabled) {
+            startAutoScanFeatures();
+        } else {
+            stopAutoScanFeatures();
+        }
+
+        if (featureStates.featureQueueingEnabled) {
+            startAutoCallNumberFeature();
+        } else {
+            stopAutoCallNumberFeature();
+        }
+        
+        manageTTSFeature();
     }
     
     function stopAllFeatures() {
         stopNextDayFeature();
         stopAutoScanFeatures();
         stopAutoCallNumberFeature();
+        stopCheckoutDataProcessingAndTTS();
         if (typeof window.removeShopeeFileScannerUI === 'function') {
             window.removeShopeeFileScannerUI();
         }
@@ -112,35 +160,20 @@ window.addEventListener('DOMContentLoaded', () => {
     let spokenPhrasesThisSession = new Set();
 
     function checkUrlAndResetStates(newUrl, isInitialLoad = false) {
+        manageTTSFeature();
+        let needsCheckoutActionReset = false;
         const isOnTargetUrl = newUrl.startsWith(CHECKOUT_TARGET_URL);
         const previousUrlWasTarget = currentUrl.startsWith(CHECKOUT_TARGET_URL);
 
-        if (!isOnTargetUrl && previousUrlWasTarget) {
-            stopCheckoutDataProcessingAndTTS();
-        } else if (isOnTargetUrl && (!previousUrlWasTarget || newUrl !== currentUrl || isInitialLoad)) {
-            stopCheckoutDataProcessingAndTTS();
-            startCheckoutDataProcessingAndTTS();
-        }
-
-        let needsCheckoutActionReset = false;
-        if (isInitialLoad) {
-            if (!isOnTargetUrl) {
-                needsCheckoutActionReset = true;
-            }
-        } else {
-            if (previousUrlWasTarget && !isOnTargetUrl) {
-                 needsCheckoutActionReset = true;
-            }
-            else if (!previousUrlWasTarget && isOnTargetUrl) {
-                 needsCheckoutActionReset = true;
-            }
+        if (isInitialLoad && !isOnTargetUrl) {
+            needsCheckoutActionReset = true;
+        } else if (previousUrlWasTarget !== isOnTargetUrl) {
+            needsCheckoutActionReset = true;
         }
 
         if (needsCheckoutActionReset && checkoutActionPerformed) {
             checkoutActionPerformed = false;
         }
-
-        urlChangedFunction_BoxScan(newUrl);
         currentUrl = newUrl;
     }
 
@@ -151,62 +184,15 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         autoCheckout();
     }, 750);
-
-    let currentUrl_BoxScan = window.location.href;
-    const intervalId_BoxScan = setInterval(function() {
-        const newUrl = window.location.href;
-        if (newUrl !== currentUrl_BoxScan) {
-            currentUrl_BoxScan = newUrl;
-            urlChangedFunction_BoxScan();
-        }
-    }, 500);
-
-    function urlChangedFunction_BoxScan() {
-        if (!featureStates.masterEnabled || !featureStates.featureBoxScanEnabled) {
-            return;
-        }
-
-        if (window.location.href.includes('https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to/scan-to-new')) {
-            setTimeout(() => {
-                const divElement = document.querySelectorAll('.ssc-input-shape-default');
-                if (divElement.length >= 2) {
-                    const secounddivElement = divElement[1];
-                    const inputElement = secounddivElement.querySelector('input');
-                    if (inputElement) {
-                        if (!inputElement.dataset.boxScanListenerAdded) {
-                             inputElement.addEventListener('focus', function handleBoxScanFocus() {
-                                if (!featureStates.masterEnabled || !featureStates.featureBoxScanEnabled) return;
-                                this.value = 'BOX999999999';
-                                const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
-                                this.dispatchEvent(enterEvent);
-                             });
-                             inputElement.dataset.boxScanListenerAdded = "true";
-                         }
-                    }
-                }
-            }, 500);
-        }
-    }
-    urlChangedFunction_BoxScan();
-    setInterval(()=>{urlChangedFunction_BoxScan()},1000);
-
+    
     let autoCallNumberIntervalId = null;
 
     function performAutoCallNumberLogic() {
-        if (!featureStates.masterEnabled || !featureStates.featureQueueingEnabled) {
-            stopAutoCallNumberFeature();
-            return;
-        }
-
-        const currentUrl = window.location.href;
-        if (currentUrl === 'https://sp.spx.shopee.tw/queueing-management/queueing-task') {
+        if (window.location.href === 'https://sp.spx.shopee.tw/queueing-management/queueing-task') {
             const button = document.querySelector('.ssc-btn-type-text');
             if (button) {
-                if (featureStates.featureQueueingAction === true) {
-                    button.click();
-                } else {
-                    button.focus();
-                }
+                if (featureStates.featureQueueingAction) button.click();
+                else button.focus();
             }
         }
     }
@@ -228,22 +214,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function startNextDayFeature() {
         if (nextDayIntervalId) return;
-        nextDayIntervalId = setInterval(function() {
+        nextDayIntervalId = setInterval(() => {
             const targetUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-to/detail/';
             if (window.location.href.includes(targetUrl)) {
-                if (featureStates.featureNextDayEnabled) {
-                    checkAndClickNextDay();
-                    addOrUpdateNextDayCheckbox();
-                    addOrUpdateOneItemPerBoxCheckbox();
-                    if (featureStates.featureOneItemPerBoxEnabled) {
-                        autoFocusForSingleItem();
-                    }
-                    startNextDayObserver();
-                } else {
-                    stopNextDayObserver();
-                    removeNextDayCheckbox();
-                    removeOneItemPerBoxCheckbox();
+                checkAndClickNextDay();
+                addOrUpdateNextDayCheckbox();
+                addOrUpdateOneItemPerBoxCheckbox();
+                if (featureStates.featureOneItemPerBoxEnabled) {
+                    autoFocusForSingleItem();
                 }
+                startNextDayObserver();
             } else {
                 stopNextDayObserver();
                 removeNextDayCheckbox();
@@ -271,13 +251,13 @@ window.addEventListener('DOMContentLoaded', () => {
             const dropOffUrl = 'https://sp.spx.shopee.tw/outbound-management/pack-drop-off-to';
             const currentHref = window.location.href;
 
-            if (currentHref.includes(packToUrl)) {
+            if (currentHref.includes(packToUrl) && featureStates.featureNextDayAutoScanEnabled) {
                 addOrUpdateNextDayAutoScanCheckbox();
             } else {
                 removeNextDayAutoScanCheckbox();
             }
             
-            if (currentHref.includes(dropOffUrl)) {
+            if (currentHref.includes(dropOffUrl) && featureStates.featureToAutoScanEnabled) {
                 addOrUpdateToAutoScanCheckbox();
             } else {
                 removeToAutoScanCheckbox();
@@ -297,9 +277,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function startNextDayObserver() {
         if (nextDayObserver) return;
         nextDayObserver = new MutationObserver((mutationsList) => {
-            if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled || !featureStates.featureNextDayAutoStartEnabled) {
-                return;
-            }
+            if (!featureStates.featureNextDayAutoStartEnabled) return;
             for (const mutation of mutationsList) {
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === 1 && node.classList.contains('ssc-message')) {
@@ -309,14 +287,11 @@ window.addEventListener('DOMContentLoaded', () => {
                             const nowSelector = '.submenu-item.ssc-menu-item.ssc-menu-item-active.ssc-menu-item-selected';
                             const now = document.querySelector(nowSelector);
                             if (now) now.click();
-
                             setTimeout(() => {
-                                 if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled || !featureStates.featureNextDayAutoStartEnabled) return;
                                  const startSelector = '.ssc-pro-table-tool-btn-wrap > button.ssc-btn-type-primary';
                                  const start = document.querySelector(startSelector);
-                                 if (start) {
-                                     start.click();
-                                 } else {
+                                 if (start) start.click();
+                                 else {
                                       const fallbackStart = document.querySelector('.ssc-pro-table-toolbar .ssc-btn-primary');
                                       if (fallbackStart) fallbackStart.click();
                                  }
@@ -342,30 +317,25 @@ window.addEventListener('DOMContentLoaded', () => {
         if (divElements.length >= 3) {
             const secoundDivElement = divElements[2];
             const inputElement = secoundDivElement.querySelector('input');
-
             if (inputElement && !inputElement.dataset.nextDayFocusListenerAdded) {
                 inputElement.addEventListener('focus', function() {
-                     if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
                     this.value = 'BOX999999999';
                     const btnDistance = document.querySelector('.ssc-button.btn-distance');
                     if (btnDistance) btnDistance.click();
                 });
                 inputElement.dataset.nextDayFocusListenerAdded = "true";
             }
-
             const buttons = document.querySelectorAll('.ssc-button.ssc-btn-type-primary:not(.ssc-btn-plain)');
             buttons.forEach(button => {
                 if (button.textContent.trim() === '完成') { 
-                    const listenerMarker = 'myCustomCompletionListener'; 
-                    if (!button.dataset[listenerMarker]) {
-                        button.addEventListener('click', function () {
-                            if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled) return;
+                    if (!button.dataset.myCustomCompletionListener) {
+                        button.addEventListener('click', () => {
                             setTimeout(() => {
                                 const btnDistance = document.querySelector('.ssc-button.btn-distance');
                                 if (btnDistance) btnDistance.click();
                             }, 300);
                         });
-                        button.dataset[listenerMarker] = "true"; 
+                        button.dataset.myCustomCompletionListener = "true"; 
                     }
                 }
             });
@@ -373,10 +343,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     
     function autoFocusForSingleItem() {
-        if (!featureStates.masterEnabled || !featureStates.featureNextDayEnabled || !featureStates.featureOneItemPerBoxEnabled) {
-            return;
-        }
-
         const tableRows = document.querySelectorAll('.ssc-table-row.ssc-table-row-normal');
         if (tableRows.length === 1) {
             const divElements = document.querySelectorAll('.ssc-input-shape-default');
@@ -391,183 +357,82 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function addOrUpdateNextDayCheckbox() {
-        const sscDiv = document.querySelector('.ssc-breadcrumb');
-        if (!sscDiv) return;
+    function createCheckbox(id, checked, onChange, text) {
+        const groupLabel = document.createElement('label');
+        groupLabel.id = `group_${id}`;
+        groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = id;
+        checkbox.checked = checked;
+        checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
+        checkbox.addEventListener('change', onChange);
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.style.cssText = 'font-size: 13px; vertical-align: middle;';
+        groupLabel.appendChild(checkbox);
+        groupLabel.appendChild(span);
+        return groupLabel;
+    }
 
-        let groupLabel = document.getElementById('group_nextday_auto_start');
-
+    function addOrUpdateCheckbox(containerSelector, id, state, key, text, afterElId) {
+        const container = document.querySelector(containerSelector);
+        if (!container) return;
+        let groupLabel = document.getElementById(`group_${id}`);
         if (!groupLabel) {
-            groupLabel = document.createElement('label');
-            groupLabel.id = 'group_nextday_auto_start';
-            groupLabel.style.cssText = 'margin-left: 20px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'status';
-            checkbox.checked = featureStates.featureNextDayAutoStartEnabled;
-            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
-
-            checkbox.addEventListener('change', function() {
-                featureStates.featureNextDayAutoStartEnabled = this.checked;
-                chrome.storage.sync.set({ featureNextDayAutoStartEnabled: this.checked });
-            });
-
-            const span = document.createElement('span');
-            span.textContent = '自動開始下一筆';
-            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
-
-            groupLabel.appendChild(checkbox);
-            groupLabel.appendChild(span);
-            sscDiv.appendChild(groupLabel);
-
+            groupLabel = createCheckbox(id, state, function() {
+                featureStates[key] = this.checked;
+                chrome.storage.sync.set({ [key]: this.checked });
+            }, text);
+            const afterEl = afterElId ? document.getElementById(afterElId) : container.lastElementChild;
+            if (afterEl && afterEl.parentNode === container) {
+                afterEl.insertAdjacentElement('afterend', groupLabel);
+            } else {
+                container.appendChild(groupLabel);
+            }
         } else {
-             const existingCheckbox = groupLabel.querySelector('#status');
-             if (existingCheckbox && existingCheckbox.checked !== featureStates.featureNextDayAutoStartEnabled) {
-                 existingCheckbox.checked = featureStates.featureNextDayAutoStartEnabled;
-             }
+            const checkbox = groupLabel.querySelector(`#${id}`);
+            if (checkbox && checkbox.checked !== state) {
+                checkbox.checked = state;
+            }
         }
+    }
+
+    function removeCheckbox(id) {
+        const groupEl = document.getElementById(`group_${id}`);
+        if (groupEl) groupEl.remove();
+    }
+
+    function addOrUpdateNextDayCheckbox() {
+        addOrUpdateCheckbox('.ssc-breadcrumb', 'status', featureStates.featureNextDayAutoStartEnabled, 'featureNextDayAutoStartEnabled', '自動開始下一筆');
     }
 
     function removeNextDayCheckbox() {
-        const groupEl = document.getElementById('group_nextday_auto_start');
-        if (groupEl) groupEl.remove();
+        removeCheckbox('status');
     }
 
     function addOrUpdateOneItemPerBoxCheckbox() {
-        const sscDiv = document.querySelector('.ssc-breadcrumb');
-        if (!sscDiv) return;
-
-        let groupLabel = document.getElementById('group_one_item_per_box_focus');
-
-        if (!groupLabel) {
-            groupLabel = document.createElement('label');
-            groupLabel.id = 'group_one_item_per_box_focus';
-            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'oneItemPerBoxFocusCheckbox';
-            checkbox.checked = featureStates.featureOneItemPerBoxEnabled;
-            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
-
-            checkbox.addEventListener('change', function() {
-                featureStates.featureOneItemPerBoxEnabled = this.checked;
-                chrome.storage.sync.set({ featureOneItemPerBoxEnabled: this.checked });
-            });
-
-            const span = document.createElement('span');
-            span.textContent = '一件一箱';
-            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
-
-            groupLabel.appendChild(checkbox);
-            groupLabel.appendChild(span);
-
-            const nextDayAutoStartGroup = document.getElementById('group_nextday_auto_start');
-            if (nextDayAutoStartGroup) {
-                nextDayAutoStartGroup.insertAdjacentElement('afterend', groupLabel);
-            } else {
-                sscDiv.appendChild(groupLabel);
-            }
-        } else {
-            const existingCheckbox = groupLabel.querySelector('#oneItemPerBoxFocusCheckbox');
-            if (existingCheckbox && existingCheckbox.checked !== featureStates.featureOneItemPerBoxEnabled) {
-                existingCheckbox.checked = featureStates.featureOneItemPerBoxEnabled;
-            }
-        }
+        addOrUpdateCheckbox('.ssc-breadcrumb', 'oneItemPerBoxFocusCheckbox', featureStates.featureOneItemPerBoxEnabled, 'featureOneItemPerBoxEnabled', '一件一箱', 'group_status');
     }
 
     function removeOneItemPerBoxCheckbox() {
-        const groupEl = document.getElementById('group_one_item_per_box_focus');
-        if (groupEl) groupEl.remove();
+        removeCheckbox('oneItemPerBoxFocusCheckbox');
     }
 
     function addOrUpdateNextDayAutoScanCheckbox() {
-        const sscDiv = document.querySelector('.ssc-layout-item.header-container.ssc-layout-item-stick-top.ssc-layout-item-direction-right');
-        if (!sscDiv) return;
-
-        let groupLabel = document.getElementById('group_next_day_auto_scan');
-        if (!groupLabel) {
-            groupLabel = document.createElement('label');
-            groupLabel.id = 'group_next_day_auto_scan';
-            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'nextDayAutoScanCheckbox';
-            checkbox.checked = featureStates.featureNextDayAutoScanEnabled;
-            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
-
-            checkbox.addEventListener('change', function() {
-                featureStates.featureNextDayAutoScanEnabled = this.checked;
-                chrome.storage.sync.set({ featureNextDayAutoScanEnabled: this.checked });
-            });
-
-            const span = document.createElement('span');
-            span.textContent = '隔日自動刷件';
-            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
-            
-            groupLabel.appendChild(checkbox);
-            groupLabel.appendChild(span);
-            sscDiv.appendChild(groupLabel);
-        } else {
-            const existingCheckbox = groupLabel.querySelector('#nextDayAutoScanCheckbox');
-            if (existingCheckbox && existingCheckbox.checked !== featureStates.featureNextDayAutoScanEnabled) {
-                existingCheckbox.checked = featureStates.featureNextDayAutoScanEnabled;
-            }
-        }
+        addOrUpdateCheckbox('.ssc-layout-item.header-container', 'nextDayAutoScanCheckbox', featureStates.featureNextDayAutoScanEnabled, 'featureNextDayAutoScanEnabled', '隔日自動刷件');
     }
 
     function removeNextDayAutoScanCheckbox() {
-        const groupEl = document.getElementById('group_next_day_auto_scan');
-        if (groupEl) groupEl.remove();
+        removeCheckbox('nextDayAutoScanCheckbox');
     }
     
     function addOrUpdateToAutoScanCheckbox() {
-        const sscDiv = document.querySelector('.ssc-breadcrumb');
-        if (!sscDiv) return;
-
-        let groupLabel = document.getElementById('group_to_auto_scan');
-        if (!groupLabel) {
-            groupLabel = document.createElement('label');
-            groupLabel.id = 'group_to_auto_scan';
-            groupLabel.style.cssText = 'margin-left: 10px; display: inline-flex; align-items: center; cursor: pointer; vertical-align: middle;';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'toAutoScanCheckbox';
-            checkbox.checked = featureStates.featureToAutoScanEnabled;
-            checkbox.style.cssText = 'margin-right: 5px; vertical-align: middle;';
-
-            checkbox.addEventListener('change', function() {
-                featureStates.featureToAutoScanEnabled = this.checked;
-                chrome.storage.sync.set({ featureToAutoScanEnabled: this.checked });
-            });
-
-            const span = document.createElement('span');
-            span.textContent = 'TO單自動刷取';
-            span.style.cssText = 'font-size: 13px; vertical-align: middle;';
-
-            groupLabel.appendChild(checkbox);
-            groupLabel.appendChild(span);
-            
-            const lastCheckbox = document.getElementById('group_next_day_auto_scan') || document.getElementById('group_one_item_per_box_focus') || document.getElementById('group_nextday_auto_start') || sscDiv.lastElementChild;
-            if (lastCheckbox) {
-                lastCheckbox.insertAdjacentElement('afterend', groupLabel);
-            } else {
-                sscDiv.appendChild(groupLabel);
-            }
-        } else {
-            const existingCheckbox = groupLabel.querySelector('#toAutoScanCheckbox');
-            if (existingCheckbox && existingCheckbox.checked !== featureStates.featureToAutoScanEnabled) {
-                existingCheckbox.checked = featureStates.featureToAutoScanEnabled;
-            }
-        }
+        addOrUpdateCheckbox('.ssc-breadcrumb', 'toAutoScanCheckbox', featureStates.featureToAutoScanEnabled, 'featureToAutoScanEnabled', 'TO單自動刷取');
     }
 
     function removeToAutoScanCheckbox() {
-        const groupEl = document.getElementById('group_to_auto_scan');
-        if (groupEl) groupEl.remove();
+        removeCheckbox('toAutoScanCheckbox');
     }
 
     loadFeatureStates();
@@ -589,6 +454,17 @@ window.addEventListener('DOMContentLoaded', () => {
             speechSynthesis.cancel();
         }
         spokenPhrasesThisSession.clear();
+    }
+
+    function manageTTSFeature() {
+        const isOnTargetUrl = window.location.href.startsWith(CHECKOUT_TARGET_URL);
+        const isTTSEnabled = featureStates.masterEnabled && featureStates.featureTTSEnabled;
+
+        if (isOnTargetUrl && isTTSEnabled) {
+            startCheckoutDataProcessingAndTTS();
+        } else {
+            stopCheckoutDataProcessingAndTTS();
+        }
     }
 
     function processAndSpeakCheckoutData() {
@@ -647,10 +523,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const itemsToSpeakInOrder = [];
 
-        if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled) {
-            return;
-        }
-
         if (featureStates.featureTTSLocationEnabled) {
             if (newFormattedTexts.length > 0) {
                 const formattedCabinetCodes = newFormattedTexts.map(text => {
@@ -686,10 +558,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     function speakTextArray(items) {
-        if (!featureStates.masterEnabled || !featureStates.featureTTSEnabled || !items || items.length === 0) {
-            return;
-        }
-        if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') {
+        if (!items || items.length === 0 || typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') {
             return;
         }
         speechSynthesis.cancel();
@@ -1416,7 +1285,7 @@ window.addEventListener('DOMContentLoaded', () => {
                                     updateStatusSpan(statusPrefix + `已輸入文字條碼 ${code.substring(0,6)}... (${simulatedCount}/${foundTextCodes.size})`, 'grey');
                                     await new Promise(r => setTimeout(r, 500));
                                 } catch (simError) {
-                                    updateStatusSpan(statusPrefix + `輸入文字條碼 ${code.substring(0,6)}... 失败`, 'red');
+                                    updateStatusSpan(statusPrefix + `輸入文字條碼 ${code.substring(0,6)}... 失敗`, 'red');
                                 }
                             }
                             currentRuntimeFeatureStates = await getFeatureStatesFromContent();
