@@ -33,6 +33,9 @@
                 "https://sp.spx.shopee.tw/*"
             ],
             "js": [
+                "libs/pdf.min.js",  
+                "libs/html5-qrcode.min.js",
+                "libs/pdf.worker.min.js",
                 "content.js"
             ],
             "run_at": "document_start"
