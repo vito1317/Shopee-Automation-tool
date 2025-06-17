@@ -67,20 +67,20 @@ chrome.runtime.sendMessage({ action: 'checkKioskStatus' }, (response) => {
 window.addEventListener('DOMContentLoaded', () => {
 
     let featureStates = {
-        masterEnabled: true,
-        featureFileScanEnabled: true,
-        featureQueueingEnabled: true,
-        featureQueueingAction: true,
-        featureNextDayEnabled: true,
-        featureNextDayAutoStartEnabled: true,
-        featureCheckoutEnabled: true,
-        featureCheckoutAction: true,
-        featureOneItemPerBoxEnabled: true,
-        featureTTSEnabled: true,
-        featureTTSLocationEnabled: true,
-        featureTTSAmountEnabled: true,
-        featureNextDayAutoScanEnabled: true,
-        featureToAutoScanEnabled: true,
+        masterEnabled: false,
+        featureFileScanEnabled: false,
+        featureQueueingEnabled: false,
+        featureQueueingAction: false,
+        featureNextDayEnabled: false,
+        featureNextDayAutoStartEnabled: false,
+        featureCheckoutEnabled: false,
+        featureCheckoutAction: false,
+        featureOneItemPerBoxEnabled: false,
+        featureTTSEnabled: false,
+        featureTTSLocationEnabled: false,
+        featureTTSAmountEnabled: false,
+        featureNextDayAutoScanEnabled: false,
+        featureToAutoScanEnabled: false,
         kioskModeEnabled: false
     };
 

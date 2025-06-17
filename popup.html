@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -9,7 +8,7 @@
 <body>
 
     <div class="header">
-        <h3>蝦皮自動化工具 v6.25.2</h3>
+        <h3>蝦皮自動化工具 v6.28.2</h3>
         <div class="master-control">
             <label class="switch">
                 <input type="checkbox" id="masterSwitch">
@@ -18,7 +17,17 @@
             <span id="masterStatusText">啟用所有功能</span>
         </div>
     </div>
-    
+
+    <div id="password-prompt-container" class="password-prompt">
+        <p class="password-prompt-label">請輸入密碼以啟用</p>
+        <input type="password" id="passwordInput" placeholder="密碼">
+        <div class="password-prompt-buttons">
+            <button id="cancelPasswordButton">取消</button>
+            <button id="submitPasswordButton">確認</button>
+        </div>
+        <p id="password-error-message" class="password-error"></p>
+    </div>
+
     <hr>
     
     <div class="feature-card">
@@ -138,6 +147,7 @@
         </div>
     </div>
 
+    <script src="libs/sha256.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

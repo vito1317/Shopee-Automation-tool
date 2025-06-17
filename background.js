@@ -79,10 +79,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        const initialStates = {
+            kioskModeEnabled: false,
+        };
+        FEATURE_KEYS.forEach(key => {
+            initialStates[key] = false;
+        });
+        chrome.storage.sync.set(initialStates);
+    }
+
     chrome.alarms.create(MIDNIGHT_ALARM, { when: getScheduledTime(0, 0), periodInMinutes: 24 * 60 });
+    
     chrome.storage.sync.get('kioskModeEnabled', ({ kioskModeEnabled }) => {
-        scheduleKioskAlarms(kioskModeEnabled);
+        scheduleKioskAlarms(!!kioskModeEnabled);
     });
 });
 
@@ -104,7 +115,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (kioskModeEnabled) {
                 const now = new Date();
                 const openTime = new Date();
-                openTime.setHours(11, 30, 0, 0);
+                openTime.setHours(11, 30, 0, 0); 
                 const closeTime = new Date();
                 closeTime.setHours(22, 30, 0, 0);
 
