@@ -11,7 +11,7 @@
 
 <div align="center">
   <h3>🚫 此項目已停止維護</h3>
-  <p><strong>最後更新日期：2024年12月</strong></p>
+  <p><strong>最後更新日期：2025年8月</strong></p>
 </div>
 
 **重要提醒：**
