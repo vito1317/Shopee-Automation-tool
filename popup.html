@@ -8,7 +8,7 @@
 <body>
 
     <div class="header">
-        <h3>蝦皮自動化工具 v6.28.2</h3>
+        <h3>蝦皮自動化工具 v6.32.2</h3>
         <div class="master-control">
             <label class="switch">
                 <input type="checkbox" id="masterSwitch">
@@ -16,16 +16,6 @@
             </label>
             <span id="masterStatusText">啟用所有功能</span>
         </div>
-    </div>
-
-    <div id="password-prompt-container" class="password-prompt">
-        <p class="password-prompt-label">請輸入密碼以啟用</p>
-        <input type="password" id="passwordInput" placeholder="密碼">
-        <div class="password-prompt-buttons">
-            <button id="cancelPasswordButton">取消</button>
-            <button id="submitPasswordButton">確認</button>
-        </div>
-        <p id="password-error-message" class="password-error"></p>
     </div>
 
     <hr>
@@ -107,6 +97,10 @@
                         <span class="setting-label">隔日自動刷件</span>
                         <label class="switch"><input type="checkbox" id="featureNextDayAutoScanSwitch"><span class="slider round"></span></label>
                     </div>
+                    <div class="setting sub-setting" data-parent-switch="#featureNextDayAutoScanSwitch">
+                        <span class="setting-label">使用NDD模式</span>
+                        <label class="switch small-switch"><input type="checkbox" id="featureNextDayNDDModeSwitch"><span class="slider round"></span></label>
+                    </div>
                     <div class="setting" data-parent-group="packing">
                         <span class="setting-label">TO單自動刷取</span>
                         <label class="switch"><input type="checkbox" id="featureToAutoScanSwitch"><span class="slider round"></span></label>
@@ -147,7 +141,6 @@
         </div>
     </div>
 
-    <script src="libs/sha256.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

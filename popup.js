@@ -13,19 +13,12 @@ document.addEventListener('DOMContentLoaded', () => {
         featureNextDayAutoStartEnabled: { el: document.getElementById('featureNextDayAutoStartSwitch'), parent: '#featureNextDaySwitch' },
         featureOneItemPerBoxEnabled: { el: document.getElementById('featureOneItemPerBoxSwitch'), parent: '#featureNextDaySwitch' },
         featureNextDayAutoScanEnabled: { el: document.getElementById('featureNextDayAutoScanSwitch'), group: 'packing' },
+        featureNextDayNDDModeEnabled: { el: document.getElementById('featureNextDayNDDModeSwitch'), parent: '#featureNextDayAutoScanSwitch' },
         featureToAutoScanEnabled: { el: document.getElementById('featureToAutoScanSwitch'), group: 'packing' },
         featureFileScanEnabled: { el: document.getElementById('featureFileScanSwitch'), group: 'assistance' }
     };
     const otherFeaturesContainer = document.getElementById('other-features-container');
     const testKioskButton = document.getElementById('testKioskButton');
-    
-    const passwordPromptContainer = document.getElementById('password-prompt-container');
-    const passwordInput = document.getElementById('passwordInput');
-    const submitPasswordButton = document.getElementById('submitPasswordButton');
-    const cancelPasswordButton = document.getElementById('cancelPasswordButton');
-    const passwordErrorMessage = document.getElementById('password-error-message');
-    
-    const correctHash = '9940c16d062ad99bbf20e524d5902cef4f6a405e23ac0242e7d58c8768914fdf';
     
     function saveState(key, value) {
         chrome.storage.sync.set({ [key]: value });
@@ -94,69 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-    
-    function proceedWithEnable() {
-        switches.masterEnabled.el.checked = true;
-        saveState('masterEnabled', true);
-        Object.entries(switches).forEach(([k, config]) => {
-            if (config.group) {
-                config.el.checked = true;
-                saveState(k, true);
-            }
-        });
-        updateUI();
-    }
-    
-    function showPasswordPrompt() {
-        passwordErrorMessage.textContent = '';
-        passwordInput.value = '';
-        passwordPromptContainer.classList.add('visible');
-        passwordInput.focus();
-    }
-
-    function hidePasswordPrompt() {
-        passwordPromptContainer.classList.remove('visible');
-        passwordInput.value = '';
-        passwordErrorMessage.textContent = '';
-    }
-    
-    submitPasswordButton.addEventListener('click', () => {
-        const password = passwordInput.value;
-        if (password && sha256(password) === correctHash) {
-            const today = getTodayString();
-            chrome.storage.local.set({ lastAuthDate: today }, () => {
-                hidePasswordPrompt();
-                proceedWithEnable();
-            });
-        } else {
-            passwordErrorMessage.textContent = '密碼錯誤';
-            passwordInput.value = '';
-            passwordInput.focus();
-        }
-    });
-
-    cancelPasswordButton.addEventListener('click', hidePasswordPrompt);
-    
-    passwordInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            submitPasswordButton.click();
-        }
-    });
 
     switches.masterEnabled.el.addEventListener('change', (event) => {
         const isTryingToEnable = event.target.checked;
         
         if (isTryingToEnable) {
-            event.preventDefault();
-            event.target.checked = false;
-            
             const today = getTodayString();
-            chrome.storage.local.get('lastAuthDate', ({ lastAuthDate }) => {
-                if (lastAuthDate === today) {
-                    proceedWithEnable();
-                } else {
-                    showPasswordPrompt();
-                }
+            chrome.storage.local.set({ lastAuthDate: today }, () => {
+                saveState('masterEnabled', true);
+                updateUI();
             });
         } else {
             saveState('masterEnabled', false);
@@ -199,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     testKioskButton.addEventListener('click', () => {
         chrome.runtime.sendMessage({ action: 'toggleTestOverlay' }, (response) => {
             if (chrome.runtime.lastError) {
-                passwordErrorMessage.textContent = '與背景腳本通訊失敗。';
+                console.error('與背景腳本通訊失敗。');
                 return;
             }
             if (!response || !response.success) {

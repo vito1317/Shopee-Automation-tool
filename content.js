@@ -65,7 +65,8 @@ chrome.runtime.sendMessage({ action: 'checkKioskStatus' }, (response) => {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-
+    console.log('NDD: content.js DOMContentLoaded 事件觸發');
+    
     let featureStates = {
         masterEnabled: false,
         featureFileScanEnabled: false,
@@ -81,15 +82,18 @@ window.addEventListener('DOMContentLoaded', () => {
         featureTTSAmountEnabled: false,
         featureNextDayAutoScanEnabled: false,
         featureToAutoScanEnabled: false,
+        featureNextDayNDDModeEnabled: false,
         kioskModeEnabled: false
     };
 
     function syncFeatureStatesToInterceptor(states) {
+        console.log('NDD: 同步功能狀態到 interceptor:', states);
         const event = new CustomEvent('extension-settings-loaded', {
             detail: {
                 masterEnabled: states.masterEnabled,
                 featureNextDayAutoScanEnabled: states.featureNextDayAutoScanEnabled,
-                featureToAutoScanEnabled: states.featureToAutoScanEnabled
+                featureToAutoScanEnabled: states.featureToAutoScanEnabled,
+                featureNextDayNDDModeEnabled: states.featureNextDayNDDModeEnabled
             }
         });
         document.documentElement.dataset.extensionFeatures = JSON.stringify(event.detail);
@@ -97,11 +101,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadFeatureStates() {
+        console.log('NDD: 開始載入功能狀態');
         const keysToGet = Object.keys(featureStates);
         chrome.storage.sync.get(keysToGet, (data) => {
+            console.log('NDD: 從 storage 獲取的數據:', data);
             Object.keys(featureStates).forEach(key => {
                 featureStates[key] = data[key] ?? featureStates[key];
             });
+            console.log('NDD: 載入後的功能狀態:', featureStates);
             syncFeatureStatesToInterceptor(featureStates);
             handleFeatureStateChange();
             checkUrlAndResetStates(window.location.href, true);
@@ -298,6 +305,23 @@ window.addEventListener('DOMContentLoaded', () => {
                         const isSuccess = node.querySelector('.ssc-message-icon.ssc-message-success');
                         const hasSuccessText = node.textContent.includes('列印成功');
                         if (isSuccess && hasSuccessText) {
+                                console.log('NDD: 檢測到列印成功訊息');
+                                console.log('NDD: 當前 featureStates.featureNextDayNDDModeEnabled:', featureStates.featureNextDayNDDModeEnabled);
+                                console.log('NDD: 檢查 dataset.nddReceiveTaskId 在檢測到成功時的值:', document.documentElement.dataset.nddReceiveTaskId);
+                                console.log('NDD: 檢查 dataset 對象是否存在:', typeof document.documentElement !== 'undefined');
+                                console.log('NDD: 檢查 dataset 的所有屬性:', Object.keys(document.documentElement.dataset || {}));
+                                console.log('NDD: 檢查 featureStates 對象:', featureStates);
+                                console.log('NDD: 檢查 featureStates.featureNextDayNDDModeEnabled 的值:', featureStates.featureNextDayNDDModeEnabled);
+                                console.log('NDD: 檢查 featureStates 的所有屬性:', Object.keys(featureStates || {}));
+
+                                if (featureStates.featureNextDayNDDModeEnabled) {
+                                    console.log('NDD: NDD 模式已啟用，準備完成 task');
+                                        console.log('NDD: 調用 completeNDDTask 函數');
+    document.dispatchEvent(new CustomEvent('ndd-complete-task'));
+                                } else {
+                                    console.log('NDD: NDD 模式未啟用，跳過 task 完成');
+                                }
+                            
                             const nowSelector = '.submenu-item.ssc-menu-item.ssc-menu-item-active.ssc-menu-item-selected';
                             const now = document.querySelector(nowSelector);
                             if (now) now.click();
@@ -325,6 +349,8 @@ window.addEventListener('DOMContentLoaded', () => {
             nextDayObserver = null;
         }
     }
+
+
 
     function checkAndClickNextDay() {
         const divElements = document.querySelectorAll('.ssc-input-shape-default');
@@ -1611,5 +1637,4 @@ window.addEventListener('DOMContentLoaded', () => {
     })();
     
     loadFeatureStates();
-
 });
