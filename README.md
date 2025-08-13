@@ -1,6 +1,6 @@
 
 ---
-# 蝦皮自動化工具 v6.28.2
+# 蝦皮自動化工具 v6.32.2
 
 <div align="center">
   <img src="https://img.shields.io/badge/狀態-已停止維護-red.svg" alt="狀態">
